@@ -6,7 +6,8 @@
     "license": "MIT",
     "scripts": {
         "seed": "ts-node prisma/seed.ts",
-        "build": "npx tsc -p tsconfig.build.json && npx tsc-alias -p tsconfig.build.json",
+        "seed:prod": "node dist/prisma/seed.js",
+        "build": "npx tsc -p tsconfig.build.json && npx tsc-alias -p tsconfig.build.json && npx tsc prisma/seed.ts --outDir dist/prisma --esModuleInterop --skipLibCheck",
         "format": "prettier --write \"src/**/*.ts\" \"prisma/schema.prisma\"",
         "start:dev": "nest start --watch",
         "start:debug": "nest start --debug --watch",
@@ -29,8 +30,7 @@
         "@nestjs/passport": "^11.0.5",
         "@nestjs/platform-express": "^11.0.1",
         "@nestjs/swagger": "^11.2.0",
-        "@prisma/adapter-pg": "^7.3.0",
-        "@prisma/client": "^7.3.0",
+        "@prisma/client": "^6.8.2",
         "bcrypt": "^6.0.0",
         "class-transformer": "^0.5.1",
         "class-validator": "^0.14.2",
@@ -41,7 +41,7 @@
         "passport-jwt": "^4.0.1",
         "passport-local": "^1.0.0",
         "pg": "^8.17.2",
-        "prisma": "^7.3.0",
+        "prisma": "^6.8.2",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.1",
         "winston": "^3.17.0"

@@ -1,6 +1,7 @@
 import { PrismaClient, TransactionType, TransactionStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
+const isProd = process.env.NODE_ENV === 'production';
 
 const randomAddress = () => `0x${[...Array(40)].map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`;
 const randomTxHash = () => `0x${[...Array(64)].map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`;
@@ -8,7 +9,7 @@ const toTokenAmount = (amount: number, decimals: number) =>
     BigInt(Math.floor(amount * Math.pow(10, decimals))).toString();
 
 async function main() {
-    console.log('🌱 Starting development seed...\n');
+    console.log(`🌱 Starting ${isProd ? 'production' : 'development'} seed...\n`);
 
     const sepolia = await prisma.chain.upsert({
         where: { id: 11155111 },
@@ -101,6 +102,32 @@ async function main() {
     });
     console.log(`✅ Admin: ${adminUser.email}`);
 
+    if (isProd) {
+        const prodUser = await prisma.user.upsert({
+            where: { email: 'user@yieldstaking.com' },
+            update: {},
+            create: {
+                email: 'user@yieldstaking.com',
+                password: hashedPassword,
+                name: 'Demo User',
+                authMethod: 'EMAIL_PASSWORD',
+                role: 'USER',
+                status: 'ACTIVE',
+                emailVerified: true,
+                emailVerifiedAt: new Date(),
+            },
+        });
+        console.log(`✅ User: ${prodUser.email}`);
+
+        console.log('\n🎉 Production seed completed!');
+        console.log('━'.repeat(40));
+        console.log('   Admin: admin@yieldstaking.com / 123');
+        console.log('   User: user@yieldstaking.com / 123');
+        console.log('━'.repeat(40));
+        return;
+    }
+
+    // Development: create test users with wallets, stakes, transactions
     const testUsers = [
         { name: 'Alice Staker', email: 'alice@test.com', wallet: '0xalice0000000000000000000000000000000001' },
         { name: 'Bob Investor', email: 'bob@test.com', wallet: '0xbob00000000000000000000000000000000002' },
@@ -337,8 +364,8 @@ async function main() {
     console.log(`   Transactions: ${summary[3]}`);
     console.log('━'.repeat(40));
     console.log('\n📝 Test credentials:');
-    console.log('   Admin: admin@yieldstaking.com / Admin@123');
-    console.log('   Users: alice@test.com, bob@test.com, etc. / Admin@123');
+    console.log('   Admin: admin@yieldstaking.com / 123');
+    console.log('   Users: alice@test.com, bob@test.com, etc. / 123');
 }
 
 main()

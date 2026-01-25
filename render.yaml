@@ -1,12 +1,11 @@
 services:
   - type: web
     name: yieldstaking-backend
-    runtime: node
+    runtime: docker
     region: singapore
     plan: free
     rootDir: d-aap/backend
-    buildCommand: npm install --legacy-peer-deps --include=dev && npm run prisma:generate && npm run build
-    startCommand: npm run prisma:deploy && npm run start:prod
+    dockerfilePath: ./Dockerfile.render
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV

@@ -1,0 +1,387 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+// For dev
+// generator dbml {
+//     provider = "prisma-dbml-generator"
+//     output   = "./schema_dbml"
+// }
+
+// ==================== ENUMS ====================
+
+enum AuthMethod {
+    EMAIL_PASSWORD
+    OAUTH_GOOGLE
+    WALLET
+    BOTH
+}
+
+enum UserRole {
+    USER
+    ADMIN
+}
+
+enum UserStatus {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}
+
+enum SyncStatus {
+    PENDING
+    PROCESSING
+    COMPLETED
+    FAILED
+}
+
+enum TransactionType {
+    STAKE
+    CLAIM
+    WITHDRAW
+    EMERGENCY_WITHDRAW
+}
+
+enum TransactionStatus {
+    PENDING
+    CONFIRMED
+    FAILED
+}
+
+enum NotificationType {
+    STAKE_CREATED
+    STAKE_CLAIMED
+    STAKE_WITHDRAWN
+    REWARD_AVAILABLE
+    STAKE_UNLOCKED
+    WALLET_VERIFIED
+    SYSTEM_ANNOUNCEMENT
+}
+
+enum NotificationStatus {
+    PENDING
+    SENT
+    READ
+    FAILED
+}
+
+model Chain {
+    id               Int               @id
+    name             String            @db.VarChar(100)
+    slug             String            @unique @db.VarChar(50)
+    rpcUrl           String?           @map("rpc_url") @db.VarChar(500)
+    explorerUrl      String?           @map("explorer_url") @db.VarChar(500)
+    isActive         Boolean           @default(true) @map("is_active")
+    createdAt        DateTime          @default(now()) @map("created_at")
+    updatedAt        DateTime          @updatedAt @map("updated_at")
+    userWallets      UserWallet[]
+    blockchainSyncs  BlockchainSync[]
+    blockchainEvents BlockchainEvent[]
+    stakingContracts StakingContract[]
+    transactions     Transaction[]
+
+    @@map("chains")
+}
+
+model User {
+    id              Int             @id @default(autoincrement())
+    email           String?         @unique @db.VarChar(255)
+    password        String?         @map("password") @db.VarChar(255)
+    name            String          @map("name") @db.VarChar(200)
+    avatar          String?         @map("avatar") @db.VarChar(500)
+    bio             String?         @map("bio") @db.Text
+    authMethod      AuthMethod      @default(WALLET) @map("auth_method")
+    emailVerified   Boolean         @default(false) @map("email_verified")
+    emailVerifiedAt DateTime?       @map("email_verified_at")
+    role            UserRole        @default(USER) @map("role")
+    status          UserStatus      @default(ACTIVE) @map("status")
+    oauthAccounts   OAuthAccount[]
+    wallets         UserWallet[]
+    sessions        UserSession[]
+    passwordResets  PasswordReset[]
+    fcmTokens       FcmToken[]
+    notifications   Notification[]
+    statistics      UserStatistics?
+    createdAt       DateTime        @default(now()) @map("created_at")
+    updatedAt       DateTime        @updatedAt @map("updated_at")
+    deletedAt       DateTime?       @map("deleted_at")
+
+    @@index([status, deletedAt])
+    @@index([role, status])
+    @@map("users")
+}
+
+model OAuthAccount {
+    id             Int       @id @default(autoincrement())
+    userId         Int       @map("user_id")
+    user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    provider       String    @map("provider") @db.VarChar(50)
+    providerId     String    @map("provider_id") @db.VarChar(255)
+    providerEmail  String?   @map("provider_email") @db.VarChar(255)
+    providerName   String?   @map("provider_name") @db.VarChar(200)
+    providerAvatar String?   @map("provider_avatar") @db.VarChar(500)
+    accessToken    String?   @map("access_token") @db.Text
+    refreshToken   String?   @map("refresh_token") @db.Text
+    expiresAt      DateTime? @map("expires_at")
+    createdAt      DateTime  @default(now()) @map("created_at")
+    updatedAt      DateTime  @updatedAt @map("updated_at")
+
+    @@unique([provider, providerId])
+    @@index([userId])
+    @@map("oauth_accounts")
+}
+
+model UserWallet {
+    id             Int             @id @default(autoincrement())
+    userId         Int             @map("user_id")
+    user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+    chainId        Int             @map("chain_id")
+    chain          Chain           @relation(fields: [chainId], references: [id])
+    walletAddress  String          @unique @map("wallet_address") @db.VarChar(42)
+    isVerified     Boolean         @default(false) @map("is_verified")
+    isPrimary      Boolean         @default(false) @map("is_primary")
+    verificationTx String?         @unique @map("verification_tx") @db.VarChar(66)
+    verifiedAt     DateTime?       @map("verified_at")
+    walletType     String          @default("MetaMask") @map("wallet_type") @db.VarChar(50)
+    createdAt      DateTime        @default(now()) @map("created_at")
+    updatedAt      DateTime        @updatedAt @map("updated_at")
+    stakePositions StakePosition[]
+    transactions   Transaction[]
+
+    @@index([userId, isPrimary])
+    @@index([chainId])
+    @@map("user_wallets")
+}
+
+model UserSession {
+    id             Int       @id @default(autoincrement())
+    userId         Int       @map("user_id")
+    user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    deviceName     String?   @map("device_name") @db.VarChar(100)
+    deviceType     String?   @map("device_type") @db.VarChar(50)
+    ip             String?   @db.VarChar(45)
+    userAgent      String?   @map("user_agent") @db.VarChar(500)
+    sessionToken   String    @unique @map("session_token") @db.Text
+    createdAt      DateTime  @default(now()) @map("created_at")
+    expiresAt      DateTime? @map("expires_at")
+    lastActivityAt DateTime  @default(now()) @map("last_activity_at")
+
+    @@index([userId])
+    @@index([expiresAt])
+    @@map("user_sessions")
+}
+
+model PasswordReset {
+    id        Int       @id @default(autoincrement())
+    token     String    @unique @db.VarChar(255)
+    userId    Int       @map("user_id")
+    user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    expiresAt DateTime  @map("expires_at")
+    isUsed    Boolean   @default(false) @map("is_used")
+    usedAt    DateTime? @map("used_at")
+    createdAt DateTime  @default(now()) @map("created_at")
+
+    @@index([userId, isUsed])
+    @@index([expiresAt])
+    @@map("password_resets")
+}
+
+model StakingContract {
+    id                  Int              @id @default(autoincrement())
+    chainId             Int              @map("chain_id")
+    chain               Chain            @relation(fields: [chainId], references: [id])
+    address             String           @unique @map("address") @db.VarChar(42)
+    stakeTokenAddress   String           @map("stake_token_address") @db.VarChar(42)
+    rewardTokenAddress  String           @map("reward_token_address") @db.VarChar(42)
+    stakeTokenSymbol    String           @map("stake_token_symbol") @db.VarChar(20)
+    rewardTokenSymbol   String           @map("reward_token_symbol") @db.VarChar(20)
+    stakeTokenDecimals  Int              @default(6) @map("stake_token_decimals")
+    rewardTokenDecimals Int              @default(18) @map("reward_token_decimals")
+    minStakeAmount      String           @default("0") @map("min_stake_amount") @db.VarChar(78)
+    maxStakePerUser     String           @default("0") @map("max_stake_per_user") @db.VarChar(78)
+    totalLocked         String           @default("0") @map("total_locked") @db.VarChar(78)
+    totalRewardDebt     String           @default("0") @map("total_reward_debt") @db.VarChar(78)
+    isPaused            Boolean          @default(false) @map("is_paused")
+    deployedAt          DateTime?        @map("deployed_at")
+    createdAt           DateTime         @default(now()) @map("created_at")
+    updatedAt           DateTime         @updatedAt @map("updated_at")
+    packages            StakingPackage[]
+    stakePositions      StakePosition[]
+
+    @@index([chainId])
+    @@map("staking_contracts")
+}
+
+model StakingPackage {
+    id             Int             @id @default(autoincrement())
+    contractId     Int             @map("contract_id")
+    contract       StakingContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+    packageId      Int             @map("package_id")
+    lockPeriod     Int             @map("lock_period")
+    apy            Int             @map("apy")
+    isEnabled      Boolean         @default(true) @map("is_enabled")
+    totalStaked    String          @default("0") @map("total_staked") @db.VarChar(78)
+    maxTotalStaked String          @default("0") @map("max_total_staked") @db.VarChar(78)
+    stakersCount   Int             @default(0) @map("stakers_count")
+    createdAt      DateTime        @default(now()) @map("created_at")
+    updatedAt      DateTime        @updatedAt @map("updated_at")
+    stakePositions StakePosition[]
+
+    @@unique([contractId, packageId])
+    @@index([contractId, isEnabled])
+    @@map("staking_packages")
+}
+
+model StakePosition {
+    id                   Int             @id @default(autoincrement())
+    walletId             Int             @map("wallet_id")
+    wallet               UserWallet      @relation(fields: [walletId], references: [id], onDelete: Cascade)
+    contractId           Int             @map("contract_id")
+    contract             StakingContract @relation(fields: [contractId], references: [id])
+    packageId            Int             @map("package_id")
+    package              StakingPackage  @relation(fields: [packageId], references: [id])
+    onChainStakeId       Int             @map("on_chain_stake_id")
+    onChainPackageId     Int             @map("on_chain_package_id")
+    principal            String          @map("principal") @db.VarChar(78)
+    rewardTotal          String          @map("reward_total") @db.VarChar(78)
+    rewardClaimed        String          @default("0") @map("reward_claimed") @db.VarChar(78)
+    lockPeriod           Int             @map("lock_period")
+    startTimestamp       DateTime        @map("start_timestamp")
+    unlockTimestamp      DateTime        @map("unlock_timestamp")
+    lastClaimTimestamp   DateTime?       @map("last_claim_timestamp")
+    isWithdrawn          Boolean         @default(false) @map("is_withdrawn")
+    isEmergencyWithdrawn Boolean         @default(false) @map("is_emergency_withdrawn")
+    stakeTxHash          String?         @unique @map("stake_tx_hash") @db.VarChar(66)
+    withdrawTxHash       String?         @unique @map("withdraw_tx_hash") @db.VarChar(66)
+    createdAt            DateTime        @default(now()) @map("created_at")
+    updatedAt            DateTime        @updatedAt @map("updated_at")
+    transactions         Transaction[]
+
+    @@unique([walletId, contractId, onChainPackageId, onChainStakeId])
+    @@index([walletId])
+    @@index([contractId])
+    @@index([packageId])
+    @@index([isWithdrawn])
+    @@index([unlockTimestamp])
+    @@map("stake_positions")
+}
+
+model Transaction {
+    id              Int               @id @default(autoincrement())
+    walletId        Int               @map("wallet_id")
+    wallet          UserWallet        @relation(fields: [walletId], references: [id], onDelete: Cascade)
+    chainId         Int               @map("chain_id")
+    chain           Chain             @relation(fields: [chainId], references: [id])
+    stakePositionId Int?              @map("stake_position_id")
+    stakePosition   StakePosition?    @relation(fields: [stakePositionId], references: [id])
+    type            TransactionType   @map("type")
+    status          TransactionStatus @default(PENDING) @map("status")
+    amount          String            @map("amount") @db.VarChar(78)
+    txHash          String?           @unique @map("tx_hash") @db.VarChar(66)
+    blockNumber     BigInt?           @map("block_number")
+    gasUsed         String?           @map("gas_used") @db.VarChar(78)
+    gasPrice        String?           @map("gas_price") @db.VarChar(78)
+    errorMessage    String?           @map("error_message") @db.Text
+    metadata        Json?             @map("metadata")
+    createdAt       DateTime          @default(now()) @map("created_at")
+    confirmedAt     DateTime?         @map("confirmed_at")
+
+    @@index([walletId, type])
+    @@index([chainId])
+    @@index([stakePositionId])
+    @@index([status])
+    @@index([createdAt])
+    @@map("transactions")
+}
+
+model UserStatistics {
+    id              Int      @id @default(autoincrement())
+    userId          Int      @unique @map("user_id")
+    user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    totalStaked     String   @default("0") @map("total_staked") @db.VarChar(78)
+    totalClaimed    String   @default("0") @map("total_claimed") @db.VarChar(78)
+    totalWithdrawn  String   @default("0") @map("total_withdrawn") @db.VarChar(78)
+    activeStakes    Int      @default(0) @map("active_stakes")
+    completedStakes Int      @default(0) @map("completed_stakes")
+    pendingRewards  String   @default("0") @map("pending_rewards") @db.VarChar(78)
+    createdAt       DateTime @default(now()) @map("created_at")
+    updatedAt       DateTime @updatedAt @map("updated_at")
+
+    @@map("user_statistics")
+}
+
+model BlockchainSync {
+    id                 Int        @id @default(autoincrement())
+    chainId            Int        @map("chain_id")
+    chain              Chain      @relation(fields: [chainId], references: [id])
+    contractAddress    String     @map("contract_address") @db.VarChar(42)
+    lastProcessedBlock BigInt     @map("last_processed_block")
+    currentBlock       BigInt?    @map("current_block")
+    status             SyncStatus @default(PENDING) @map("status")
+    errorMessage       String?    @map("error_message") @db.Text
+    createdAt          DateTime   @default(now()) @map("created_at")
+    updatedAt          DateTime   @updatedAt @map("updated_at")
+    lastSyncAt         DateTime   @map("last_sync_at")
+
+    @@unique([chainId, contractAddress])
+    @@index([chainId, status])
+    @@map("blockchain_syncs")
+}
+
+model BlockchainEvent {
+    id              Int       @id @default(autoincrement())
+    chainId         Int       @map("chain_id")
+    chain           Chain     @relation(fields: [chainId], references: [id])
+    eventName       String    @map("event_name") @db.VarChar(100)
+    contractAddress String    @map("contract_address") @db.VarChar(42)
+    txHash          String    @map("tx_hash") @db.VarChar(66)
+    blockNumber     BigInt    @map("block_number")
+    logIndex        Int       @map("log_index")
+    eventData       Json      @map("event_data")
+    processed       Boolean   @default(false) @map("processed")
+    processedAt     DateTime? @map("processed_at")
+    errorMessage    String?   @map("error_message") @db.Text
+    createdAt       DateTime  @default(now()) @map("created_at")
+
+    @@unique([txHash, logIndex])
+    @@index([chainId, eventName, processed])
+    @@index([chainId, blockNumber])
+    @@index([chainId, processed, createdAt])
+    @@map("blockchain_events")
+}
+
+model Notification {
+    id        Int                @id @default(autoincrement())
+    userId    Int                @map("user_id")
+    user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+    type      NotificationType   @map("type")
+    title     String             @db.VarChar(255)
+    message   String             @db.Text
+    status    NotificationStatus @default(PENDING) @map("status")
+    metadata  Json?              @map("metadata")
+    readAt    DateTime?          @map("read_at")
+    createdAt DateTime           @default(now()) @map("created_at")
+
+    @@index([userId, status])
+    @@index([userId, createdAt])
+    @@map("notifications")
+}
+
+model FcmToken {
+    id         Int      @id @default(autoincrement())
+    userId     Int      @map("user_id")
+    user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    token      String   @unique @map("token") @db.VarChar(500)
+    deviceInfo Json?    @map("device_info")
+    isActive   Boolean  @default(true) @map("is_active")
+    createdAt  DateTime @default(now()) @map("created_at")
+    updatedAt  DateTime @updatedAt @map("updated_at")
+
+    @@index([userId, isActive])
+    @@index([userId])
+    @@map("fcm_tokens")
+}

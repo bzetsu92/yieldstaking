@@ -1,0 +1,367 @@
+//// ------------------------------------------------------
+//// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+//// ------------------------------------------------------
+
+Table chains {
+  id Int [pk]
+  name String [not null]
+  slug String [unique, not null]
+  rpcUrl String
+  explorerUrl String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  userWallets user_wallets [not null]
+  blockchainSyncs blockchain_syncs [not null]
+  blockchainEvents blockchain_events [not null]
+  stakingContracts staking_contracts [not null]
+  transactions transactions [not null]
+}
+
+Table users {
+  id Int [pk, increment]
+  email String [unique]
+  password String
+  name String [not null]
+  avatar String
+  bio String
+  authMethod AuthMethod [not null, default: 'WALLET']
+  emailVerified Boolean [not null, default: false]
+  emailVerifiedAt DateTime
+  role UserRole [not null, default: 'USER']
+  status UserStatus [not null, default: 'ACTIVE']
+  oauthAccounts oauth_accounts [not null]
+  wallets user_wallets [not null]
+  sessions user_sessions [not null]
+  passwordResets password_resets [not null]
+  fcmTokens fcm_tokens [not null]
+  notifications notifications [not null]
+  statistics user_statistics
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+}
+
+Table oauth_accounts {
+  id Int [pk, increment]
+  userId Int [not null]
+  user users [not null]
+  provider String [not null]
+  providerId String [not null]
+  providerEmail String
+  providerName String
+  providerAvatar String
+  accessToken String
+  refreshToken String
+  expiresAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+
+  indexes {
+    (provider, providerId) [unique]
+  }
+}
+
+Table user_wallets {
+  id Int [pk, increment]
+  userId Int [not null]
+  user users [not null]
+  chainId Int [not null]
+  chain chains [not null]
+  walletAddress String [unique, not null]
+  isVerified Boolean [not null, default: false]
+  isPrimary Boolean [not null, default: false]
+  verificationTx String [unique]
+  verifiedAt DateTime
+  walletType String [not null, default: 'MetaMask']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  stakePositions stake_positions [not null]
+  transactions transactions [not null]
+}
+
+Table user_sessions {
+  id Int [pk, increment]
+  userId Int [not null]
+  user users [not null]
+  deviceName String
+  deviceType String
+  ip String
+  userAgent String
+  sessionToken String [unique, not null]
+  createdAt DateTime [default: `now()`, not null]
+  expiresAt DateTime
+  lastActivityAt DateTime [default: `now()`, not null]
+}
+
+Table password_resets {
+  id Int [pk, increment]
+  token String [unique, not null]
+  userId Int [not null]
+  user users [not null]
+  expiresAt DateTime [not null]
+  isUsed Boolean [not null, default: false]
+  usedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table staking_contracts {
+  id Int [pk, increment]
+  chainId Int [not null]
+  chain chains [not null]
+  address String [unique, not null]
+  stakeTokenAddress String [not null]
+  rewardTokenAddress String [not null]
+  stakeTokenSymbol String [not null]
+  rewardTokenSymbol String [not null]
+  stakeTokenDecimals Int [not null, default: 6]
+  rewardTokenDecimals Int [not null, default: 18]
+  minStakeAmount String [not null, default: '0']
+  maxStakePerUser String [not null, default: '0']
+  totalLocked String [not null, default: '0']
+  totalRewardDebt String [not null, default: '0']
+  isPaused Boolean [not null, default: false]
+  deployedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  packages staking_packages [not null]
+  stakePositions stake_positions [not null]
+}
+
+Table staking_packages {
+  id Int [pk, increment]
+  contractId Int [not null]
+  contract staking_contracts [not null]
+  packageId Int [not null]
+  lockPeriod Int [not null]
+  apy Int [not null]
+  isEnabled Boolean [not null, default: true]
+  totalStaked String [not null, default: '0']
+  maxTotalStaked String [not null, default: '0']
+  stakersCount Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  stakePositions stake_positions [not null]
+
+  indexes {
+    (contractId, packageId) [unique]
+  }
+}
+
+Table stake_positions {
+  id Int [pk, increment]
+  walletId Int [not null]
+  wallet user_wallets [not null]
+  contractId Int [not null]
+  contract staking_contracts [not null]
+  packageId Int [not null]
+  package staking_packages [not null]
+  onChainStakeId Int [not null]
+  onChainPackageId Int [not null]
+  principal String [not null]
+  rewardTotal String [not null]
+  rewardClaimed String [not null, default: '0']
+  lockPeriod Int [not null]
+  startTimestamp DateTime [not null]
+  unlockTimestamp DateTime [not null]
+  lastClaimTimestamp DateTime
+  isWithdrawn Boolean [not null, default: false]
+  isEmergencyWithdrawn Boolean [not null, default: false]
+  stakeTxHash String [unique]
+  withdrawTxHash String [unique]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  transactions transactions [not null]
+
+  indexes {
+    (walletId, contractId, onChainPackageId, onChainStakeId) [unique]
+  }
+}
+
+Table transactions {
+  id Int [pk, increment]
+  walletId Int [not null]
+  wallet user_wallets [not null]
+  chainId Int [not null]
+  chain chains [not null]
+  stakePositionId Int
+  stakePosition stake_positions
+  type TransactionType [not null]
+  status TransactionStatus [not null, default: 'PENDING']
+  amount String [not null]
+  txHash String [unique]
+  blockNumber BigInt
+  gasUsed String
+  gasPrice String
+  errorMessage String
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  confirmedAt DateTime
+}
+
+Table user_statistics {
+  id Int [pk, increment]
+  userId Int [unique, not null]
+  user users [not null]
+  totalStaked String [not null, default: '0']
+  totalClaimed String [not null, default: '0']
+  totalWithdrawn String [not null, default: '0']
+  activeStakes Int [not null, default: 0]
+  completedStakes Int [not null, default: 0]
+  pendingRewards String [not null, default: '0']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table blockchain_syncs {
+  id Int [pk, increment]
+  chainId Int [not null]
+  chain chains [not null]
+  contractAddress String [not null]
+  lastProcessedBlock BigInt [not null]
+  currentBlock BigInt
+  status SyncStatus [not null, default: 'PENDING']
+  errorMessage String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  lastSyncAt DateTime [not null]
+
+  indexes {
+    (chainId, contractAddress) [unique]
+  }
+}
+
+Table blockchain_events {
+  id Int [pk, increment]
+  chainId Int [not null]
+  chain chains [not null]
+  eventName String [not null]
+  contractAddress String [not null]
+  txHash String [not null]
+  blockNumber BigInt [not null]
+  logIndex Int [not null]
+  eventData Json [not null]
+  processed Boolean [not null, default: false]
+  processedAt DateTime
+  errorMessage String
+  createdAt DateTime [default: `now()`, not null]
+
+  indexes {
+    (txHash, logIndex) [unique]
+  }
+}
+
+Table notifications {
+  id Int [pk, increment]
+  userId Int [not null]
+  user users [not null]
+  type NotificationType [not null]
+  title String [not null]
+  message String [not null]
+  status NotificationStatus [not null, default: 'PENDING']
+  metadata Json
+  readAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table fcm_tokens {
+  id Int [pk, increment]
+  userId Int [not null]
+  user users [not null]
+  token String [unique, not null]
+  deviceInfo Json
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Enum AuthMethod {
+  EMAIL_PASSWORD
+  OAUTH_GOOGLE
+  WALLET
+  BOTH
+}
+
+Enum UserRole {
+  USER
+  ADMIN
+}
+
+Enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+Enum SyncStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+Enum TransactionType {
+  STAKE
+  CLAIM
+  WITHDRAW
+  EMERGENCY_WITHDRAW
+}
+
+Enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
+Enum NotificationType {
+  STAKE_CREATED
+  STAKE_CLAIMED
+  STAKE_WITHDRAWN
+  REWARD_AVAILABLE
+  STAKE_UNLOCKED
+  WALLET_VERIFIED
+  SYSTEM_ANNOUNCEMENT
+}
+
+Enum NotificationStatus {
+  PENDING
+  SENT
+  READ
+  FAILED
+}
+
+Ref: oauth_accounts.userId > users.id [delete: Cascade]
+
+Ref: user_wallets.userId > users.id [delete: Cascade]
+
+Ref: user_wallets.chainId > chains.id
+
+Ref: user_sessions.userId > users.id [delete: Cascade]
+
+Ref: password_resets.userId > users.id [delete: Cascade]
+
+Ref: staking_contracts.chainId > chains.id
+
+Ref: staking_packages.contractId > staking_contracts.id [delete: Cascade]
+
+Ref: stake_positions.walletId > user_wallets.id [delete: Cascade]
+
+Ref: stake_positions.contractId > staking_contracts.id
+
+Ref: stake_positions.packageId > staking_packages.id
+
+Ref: transactions.walletId > user_wallets.id [delete: Cascade]
+
+Ref: transactions.chainId > chains.id
+
+Ref: transactions.stakePositionId > stake_positions.id
+
+Ref: user_statistics.userId - users.id [delete: Cascade]
+
+Ref: blockchain_syncs.chainId > chains.id
+
+Ref: blockchain_events.chainId > chains.id
+
+Ref: notifications.userId > users.id [delete: Cascade]
+
+Ref: fcm_tokens.userId > users.id [delete: Cascade]

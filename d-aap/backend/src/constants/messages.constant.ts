@@ -1,0 +1,95 @@
+export const ERR_MESSAGES = {
+    AUTH: {
+        INVALID_CREDENTIALS: "Invalid email or password",
+        INVALID_REFRESH_TOKEN: "Invalid or expired refresh token",
+        UNAUTHORIZED: "Unauthorized access",
+        EMAIL_ALREADY_EXISTS: "Email already registered",
+        WALLET_ALREADY_EXISTS: "Wallet address already registered",
+        NONCE_INVALID: "Invalid or expired nonce",
+        SIGNATURE_INVALID: "Invalid signature",
+        WALLET_NOT_FOUND: "Wallet not found",
+        NO_ACTIVE_CHAIN: "No active blockchain chain configured",
+        SESSION_EXPIRED: "Session has expired",
+        ACCOUNT_SUSPENDED: "Account has been suspended",
+        ACCOUNT_INACTIVE: "Account is inactive",
+    },
+    USER: {
+        NOT_FOUND: "User not found",
+        PROFILE_UPDATE_FAILED: "Failed to update profile",
+        WALLET_LINK_FAILED: "Failed to link wallet",
+        WALLET_ALREADY_LINKED: "Wallet is already linked to another account",
+        STATISTICS_NOT_FOUND: "User statistics not found",
+        EMAIL_INVALID: "Invalid email address",
+    },
+    PASSWORD_RESET: {
+        INVALID_TOKEN: "Invalid or expired password reset token",
+        TOKEN_ALREADY_USED: "Password reset token has already been used",
+        EMAIL_REQUIRED: "Email is required",
+        TOKEN_REQUIRED: "Reset token is required",
+        NEW_PASSWORD_REQUIRED: "New password is required",
+        NEW_PASSWORD_INVALID:
+            "Password must be at least 8 characters with uppercase, lowercase, number and special character",
+    },
+    STAKING: {
+        PACKAGE_NOT_FOUND: "Staking package not found",
+        PACKAGE_DISABLED: "Staking package is disabled",
+        POSITION_NOT_FOUND: "Stake position not found",
+        ALREADY_WITHDRAWN: "Stake has already been withdrawn",
+        NOT_UNLOCKED: "Stake has not been unlocked yet",
+        INSUFFICIENT_BALANCE: "Insufficient balance",
+        BELOW_MINIMUM: "Stake amount is below minimum",
+        ABOVE_MAXIMUM: "Stake amount exceeds maximum per user",
+        CONTRACT_NOT_FOUND: "Staking contract not found",
+        CONTRACT_PAUSED: "Staking contract is paused",
+        INVALID_AMOUNT: "Invalid stake amount",
+        NO_REWARDS: "No rewards available to claim",
+    },
+    TRANSACTION: {
+        NOT_FOUND: "Transaction not found",
+        ALREADY_PROCESSED: "Transaction has already been processed",
+        FAILED: "Transaction failed",
+        INVALID_TX_HASH: "Invalid transaction hash",
+    },
+    BLOCKCHAIN: {
+        SYNC_FAILED: "Blockchain synchronization failed",
+        EVENT_PROCESSING_FAILED: "Failed to process blockchain event",
+        CONNECTION_FAILED: "Failed to connect to blockchain",
+        INVALID_CHAIN: "Invalid blockchain chain",
+    },
+    VALIDATION: {
+        INVALID_ADDRESS: "Invalid wallet address",
+        INVALID_AMOUNT: "Invalid amount",
+        REQUIRED_FIELD: "This field is required",
+    },
+};
+
+export const SUCCESS_MESSAGES = {
+    AUTH: {
+        LOGIN_SUCCESS: "Successfully logged in",
+        LOGOUT_SUCCESS: "Successfully logged out",
+        LOGGED_OUT: "Successfully logged out",
+        REGISTER_SUCCESS: "Successfully registered",
+        ACCOUNT_CREATED: "Account created successfully",
+        PASSWORD_RESET_SENT:
+            "If the email exists, a password reset link has been sent",
+        PASSWORD_RESET_SUCCESS: "Password has been reset successfully",
+        PASSWORD_RESET_TOKEN_GENERATED: "Password reset token generated",
+        WALLET_CONNECTED: "Wallet connected successfully",
+    },
+    USER: {
+        PROFILE_UPDATED: "Profile updated successfully",
+        WALLET_LINKED: "Wallet linked successfully",
+        STATISTICS_UPDATED: "Statistics updated successfully",
+    },
+    STAKING: {
+        STAKE_CREATED: "Stake created successfully",
+        REWARDS_CLAIMED: "Rewards claimed successfully",
+        STAKE_WITHDRAWN: "Stake withdrawn successfully",
+        PACKAGE_CREATED: "Staking package created successfully",
+        PACKAGE_UPDATED: "Staking package updated successfully",
+    },
+    TRANSACTION: {
+        CREATED: "Transaction created successfully",
+        CONFIRMED: "Transaction confirmed successfully",
+    },
+};

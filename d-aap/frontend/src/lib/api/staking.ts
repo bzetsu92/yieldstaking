@@ -1,0 +1,171 @@
+import { api } from './client';
+import { handleApiError } from '../utils/api-error-handler';
+
+export interface StakingContract {
+    id: number;
+    chainId: number;
+    address: string;
+    stakeTokenAddress: string;
+    rewardTokenAddress: string;
+    stakeTokenSymbol: string;
+    rewardTokenSymbol: string;
+    stakeTokenDecimals: number;
+    rewardTokenDecimals: number;
+    totalLocked: string;
+    isPaused: boolean;
+    chain: {
+        id: number;
+        name: string;
+        slug: string;
+        explorerUrl: string;
+    };
+    packages: StakingPackage[];
+}
+
+export interface StakingPackage {
+    id: number;
+    packageId: number;
+    lockPeriod: number;
+    apy: number;
+    isEnabled: boolean;
+    totalStaked: string;
+    stakersCount: number;
+}
+
+export interface StakePosition {
+    id: number;
+    onChainStakeId: number;
+    onChainPackageId: number;
+    principal: string;
+    rewardTotal: string;
+    rewardClaimed: string;
+    lockPeriod: number;
+    startTimestamp: string;
+    unlockTimestamp: string;
+    isWithdrawn: boolean;
+    package: StakingPackage;
+}
+
+export interface StakePositionsResponse {
+    positions: StakePosition[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+}
+
+export interface StakingSummary {
+    totalActiveStakes: number;
+    totalPrincipalStaked: string;
+    totalRewardEarned: string;
+    totalRewardClaimed: string;
+    totalPendingReward: string;
+    upcomingUnlocks: {
+        positionId: number;
+        unlockDate: string;
+        principal: string;
+    }[];
+}
+
+export interface GlobalStatistics {
+    totalLocked: string;
+    totalRewardDistributed: string;
+    uniqueStakers: number;
+    activePositions: number;
+    contractCount: number;
+}
+
+export async function fetchStakingContracts(chainId?: number): Promise<StakingContract[]> {
+    try {
+        const params = chainId ? { chainId } : undefined;
+        return await api.get<StakingContract[]>('/v1/staking/contracts', { params });
+    } catch (error: unknown) {
+        throw handleApiError({
+            error,
+            context: 'Failed to fetch staking contracts',
+            showToast: false,
+        });
+    }
+}
+
+export async function fetchStakingContract(id: number): Promise<StakingContract> {
+    try {
+        return await api.get<StakingContract>(`/v1/staking/contracts/${id}`);
+    } catch (error: unknown) {
+        throw handleApiError({
+            error,
+            context: 'Failed to fetch staking contract',
+            showToast: false,
+        });
+    }
+}
+
+export async function fetchStakingPackages(contractId?: number): Promise<StakingPackage[]> {
+    try {
+        const params = contractId ? { contractId } : undefined;
+        return await api.get<StakingPackage[]>('/v1/staking/packages', { params });
+    } catch (error: unknown) {
+        throw handleApiError({
+            error,
+            context: 'Failed to fetch staking packages',
+            showToast: false,
+        });
+    }
+}
+
+export async function fetchMyPositions(params?: {
+    page?: number;
+    limit?: number;
+}): Promise<StakePositionsResponse> {
+    try {
+        return await api.get<StakePositionsResponse>('/v1/staking/positions', { params });
+    } catch (error: unknown) {
+        throw handleApiError({
+            error,
+            context: 'Failed to fetch stake positions',
+            showToast: false,
+        });
+    }
+}
+
+export async function fetchMySummary(): Promise<StakingSummary> {
+    try {
+        return await api.get<StakingSummary>('/v1/staking/summary');
+    } catch (error: unknown) {
+        throw handleApiError({
+            error,
+            context: 'Failed to fetch staking summary',
+            showToast: false,
+        });
+    }
+}
+
+export async function fetchGlobalStatistics(): Promise<GlobalStatistics> {
+    try {
+        return await api.get<GlobalStatistics>('/v1/staking/statistics');
+    } catch (error: unknown) {
+        throw handleApiError({
+            error,
+            context: 'Failed to fetch global statistics',
+            showToast: false,
+        });
+    }
+}
+
+export async function fetchLeaderboard(limit?: number): Promise<{
+    rank: number;
+    walletAddress: string;
+    totalStaked: string;
+    activeStakes: number;
+}[]> {
+    try {
+        const params = limit ? { limit } : undefined;
+        return await api.get('/v1/staking/leaderboard', { params });
+    } catch (error: unknown) {
+        throw handleApiError({
+            error,
+            context: 'Failed to fetch leaderboard',
+            showToast: false,
+        });
+    }
+}

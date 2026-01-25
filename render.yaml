@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: yieldstaking-backend
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: d-aap/backend
+    buildCommand: npm install --legacy-peer-deps --include=dev && npm run prisma:generate && npm run build
+    startCommand: npm run prisma:deploy && npm run start:prod
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=512
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRATION
+        value: 15m
+      - key: JWT_REFRESH_EXPIRATION
+        value: 7d
+      - key: FRONTEND_URL
+        sync: false
+      - key: BLOCKCHAIN_RPC_SEPOLIA
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

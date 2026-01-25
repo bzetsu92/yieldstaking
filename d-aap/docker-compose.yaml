@@ -1,0 +1,71 @@
+services:
+    postgres:
+        image: postgres:16-alpine
+        container_name: yieldstaking-postgres
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER:-postgres}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+            POSTGRES_DB: ${POSTGRES_DB:-yieldstaking}
+        ports:
+            - "${POSTGRES_PORT:-5432}:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-yieldstaking}",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    backend:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile.dev
+        container_name: yieldstaking-backend
+        restart: unless-stopped
+        ports:
+            - "${BACKEND_PORT:-3000}:3000"
+        environment:
+            NODE_ENV: development
+            PORT: 3000
+            DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-yieldstaking}?schema=public
+            JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-production}
+            JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+            FRONTEND_URL: http://localhost:${FRONTEND_PORT:-8080}
+            SEPOLIA_RPC_URL: ${SEPOLIA_RPC_URL:-https://ethereum-sepolia-rpc.publicnode.com}
+            YIELD_STAKING_ADDRESS: ${YIELD_STAKING_ADDRESS:-}
+            USDT_ADDRESS: ${USDT_ADDRESS:-}
+            AUREUS_ADDRESS: ${AUREUS_ADDRESS:-}
+        volumes:
+            - ./backend:/app
+            - /app/node_modules
+        depends_on:
+            postgres:
+                condition: service_healthy
+        command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run start:dev"
+
+    frontend:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile.dev
+        container_name: yieldstaking-frontend
+        restart: unless-stopped
+        ports:
+            - "${FRONTEND_PORT:-8080}:8080"
+        environment:
+            VITE_API_URL: http://localhost:${BACKEND_PORT:-3000}
+            VITE_CHAIN_ID: ${VITE_CHAIN_ID:-11155111}
+            VITE_WALLET_CONNECT_PROJECT_ID: ${VITE_WALLET_CONNECT_PROJECT_ID:-}
+        volumes:
+            - ./frontend:/app
+            - /app/node_modules
+        depends_on:
+            - backend
+        command: npm run dev -- --host
+
+volumes:
+    postgres_data:

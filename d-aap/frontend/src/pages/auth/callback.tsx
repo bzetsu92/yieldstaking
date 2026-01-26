@@ -32,7 +32,7 @@ export default function AuthCallbackPage() {
                     description: 'Welcome back!',
                 });
 
-                const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+                const callbackUrl = searchParams.get('callbackUrl') || '/app';
                 navigate(callbackUrl);
             } else {
                 toast.error('Authentication failed', {

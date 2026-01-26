@@ -186,7 +186,7 @@ export default function StakePage() {
                                         Stake your tokens and earn competitive yields based on your lock period.
                                     </p>
                                     <p className="text-sm text-slate-400">
-                                        Current staking rewards are available through the end of Q1. <Link to="/yield-staking" className="text-primary hover:underline">Check details here</Link>.
+                                        Current staking rewards are available through the end of Q1. <Link to="/app/yield-staking" className="text-primary hover:underline">Check details here</Link>.
                                     </p>
                                 </div>
                                 <div className="text-right bg-slate-800/50 rounded-lg p-4 min-w-[140px]">

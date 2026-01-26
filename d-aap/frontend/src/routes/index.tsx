@@ -1,20 +1,23 @@
 import { lazy } from 'react';
-import { Navigate, type RouteObject } from 'react-router-dom';
+import { type RouteObject } from 'react-router-dom';
 
 import ProtectedRoute from '@/components/auth/protected-route';
 import AppLayout from '@/components/layout/app-layout';
+import { RoleBasedRedirect } from '@/components/auth/role-based-redirect';
+
+// Public pages
+const HomePage = lazy(() => import('@/pages/home'));
 
 // Auth pages
 const LoginPage = lazy(() => import('@/pages/auth/login'));
 const AuthCallbackPage = lazy(() => import('@/pages/auth/callback'));
 const AuthErrorPage = lazy(() => import('@/pages/auth/error'));
 
-// User pages
-const DashboardPage = lazy(() => import('@/pages/dashboard'));
-const YieldStakingPage = lazy(() => import('@/pages/yield-staking'));
-const StakePage = lazy(() => import('@/pages/stake'));
-const WithdrawalsPage = lazy(() => import('@/pages/withdrawals'));
-const RewardHistoryPage = lazy(() => import('@/pages/reward-history'));
+// User pages (Aureus)
+const YieldStakingPage = lazy(() => import('@/pages/aureus/yield-staking'));
+const StakePage = lazy(() => import('@/pages/aureus/stake'));
+const WithdrawalsPage = lazy(() => import('@/pages/aureus/withdrawals'));
+const RewardHistoryPage = lazy(() => import('@/pages/aureus/reward-history'));
 
 // Admin pages
 const AdminDashboardPage = lazy(() => import('@/pages/admin/index'));
@@ -23,6 +26,9 @@ const AdminContractsPage = lazy(() => import('@/pages/admin/contracts'));
 const AdminPositionsPage = lazy(() => import('@/pages/admin/positions'));
 const AdminTransactionsPage = lazy(() => import('@/pages/admin/transactions'));
 const AdminBlockchainPage = lazy(() => import('@/pages/admin/blockchain'));
+
+// Error pages
+const NotFoundPage = lazy(() => import('@/pages/not-found'));
 
 const ProtectedPage = ({ children }: { children: React.ReactNode }) => (
     <ProtectedRoute>{children}</ProtectedRoute>
@@ -33,6 +39,12 @@ const AdminPage = ({ children }: { children: React.ReactNode }) => (
 );
 
 export const routes: RouteObject[] = [
+    // Public home page (no layout)
+    {
+        path: '/',
+        element: <HomePage />,
+    },
+    // Auth pages
     {
         path: '/login',
         element: <LoginPage />,
@@ -45,25 +57,17 @@ export const routes: RouteObject[] = [
         path: '/auth/error',
         element: <AuthErrorPage />,
     },
+    // App routes (with layout, requires login)
     {
-        path: '/',
+        path: '/app',
         element: <AppLayout />,
         children: [
             {
                 index: true,
                 element: (
                     <ProtectedRoute>
-                        <Navigate to="/dashboard" replace />
+                        <RoleBasedRedirect />
                     </ProtectedRoute>
-                ),
-            },
-            // User routes
-            {
-                path: 'dashboard',
-                element: (
-                    <ProtectedPage>
-                        <DashboardPage />
-                    </ProtectedPage>
                 ),
             },
             {
@@ -147,11 +151,16 @@ export const routes: RouteObject[] = [
                     </AdminPage>
                 ),
             },
-            // Fallback
+            // Fallback - 404 page
             {
                 path: '*',
-                element: <Navigate to="/dashboard" replace />,
+                element: <NotFoundPage />,
             },
         ],
+    },
+    // Catch-all for routes outside /app
+    {
+        path: '*',
+        element: <NotFoundPage />,
     },
 ];

@@ -60,7 +60,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
             toast.error('Access Denied', {
                 description: 'You do not have permission to access this page.',
             });
-            return <Navigate to="/dashboard" replace />;
+            return <Navigate to="/app/stake" replace />;
         }
     }
 

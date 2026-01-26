@@ -34,9 +34,9 @@ export function LoginForm({
     const navigate = useNavigate();
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     
-    const rawCallbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+    const rawCallbackUrl = searchParams.get('callbackUrl') || '/app';
     const callbackUrl = useMemo(() => {
-        return isValidCallbackUrl(rawCallbackUrl) ? rawCallbackUrl : '/dashboard';
+        return isValidCallbackUrl(rawCallbackUrl) ? rawCallbackUrl : '/app';
     }, [rawCallbackUrl]);
 
     const { address, isConnected } = useAccount();

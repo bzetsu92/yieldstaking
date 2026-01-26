@@ -23,27 +23,21 @@ const teams = [
 
 const userNavItems = [
     {
-        title: 'Home',
-        url: '/home',
-        icon: Home,
-        items: [],
-    },
-    {
         title: 'Yield Staking',
-        url: '/yield-staking',
+        url: '/app/aureus',
         icon: Sparkles,
         items: [
             {
                 title: 'Stake',
-                url: '/stake',
+                url: '/app/aureus',
             },
             {
                 title: 'Withdrawals',
-                url: '/withdrawals',
+                url: '/app/aureus/withdrawals',
             },
             {
                 title: 'Reward History',
-                url: '/reward-history',
+                url: '/app/aureus/reward-history',
             },
         ],
     },
@@ -52,32 +46,32 @@ const userNavItems = [
 const adminNavItems = [
     {
         title: 'Admin',
-        url: '/admin',
+        url: '/app/admin',
         icon: Shield,
         items: [
             {
                 title: 'Dashboard',
-                url: '/admin',
+                url: '/app/admin',
             },
             {
                 title: 'Users',
-                url: '/admin/users',
+                url: '/app/admin/users',
             },
             {
                 title: 'Contracts',
-                url: '/admin/contracts',
+                url: '/app/admin/contracts',
             },
             {
                 title: 'Positions',
-                url: '/admin/positions',
+                url: '/app/admin/positions',
             },
             {
                 title: 'Transactions',
-                url: '/admin/transactions',
+                url: '/app/admin/transactions',
             },
             {
                 title: 'Blockchain',
-                url: '/admin/blockchain',
+                url: '/app/admin/blockchain',
             },
         ],
     },

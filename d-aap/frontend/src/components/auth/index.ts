@@ -1,6 +1,7 @@
 export * from './login-form';
 export * from './protected-route';
 export * from './authentication-provider';
+export * from './role-based-redirect';
 
 // Sub-components
 export * from './login-form-header';

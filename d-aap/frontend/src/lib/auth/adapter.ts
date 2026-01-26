@@ -99,7 +99,7 @@ export const createCustomAuthenticationAdapter = () => {
                                 }));
                                 
                                 if (typeof window !== 'undefined' && window.location.pathname === '/login') {
-                                    const callbackUrl = new URLSearchParams(window.location.search).get('callbackUrl') || '/dashboard';
+                                    const callbackUrl = new URLSearchParams(window.location.search).get('callbackUrl') || '/app';
                                     if (isValidCallbackUrl(callbackUrl)) {
                                         requestAnimationFrame(() => {
                                             window.location.href = callbackUrl;

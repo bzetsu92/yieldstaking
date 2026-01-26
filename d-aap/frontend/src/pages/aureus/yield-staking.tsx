@@ -55,12 +55,12 @@ export default function YieldStakingPage() {
                                 Choose from multiple lock periods to maximize your returns.
                             </p>
                             <div className="flex flex-wrap gap-4 pt-2">
-                                <Button size="lg" onClick={() => navigate('/stake')} disabled={isPaused}>
+                                <Button size="lg" onClick={() => navigate('/app/stake')} disabled={isPaused}>
                                     Start Staking
                                     <ArrowRight className="ml-2 h-4 w-4" />
                                 </Button>
                                 {isConnected && (
-                                    <Button size="lg" variant="outline" onClick={() => navigate('/withdrawals')}>
+                                    <Button size="lg" variant="outline" onClick={() => navigate('/app/withdrawals')}>
                                         Manage Stakes
                                     </Button>
                                 )}
@@ -98,7 +98,7 @@ export default function YieldStakingPage() {
                                     <div className="text-2xl font-bold">{formatNumber(userTotalStakes, 4)} {tokenSymbol}</div>
                                     <div className="text-sm text-muted-foreground">Total Staked</div>
                                 </div>
-                                <Button variant="outline" onClick={() => navigate('/withdrawals')}>
+                                <Button variant="outline" onClick={() => navigate('/app/withdrawals')}>
                                     View Details
                                     <ArrowRight className="ml-2 h-4 w-4" />
                                 </Button>
@@ -131,7 +131,7 @@ export default function YieldStakingPage() {
                                     </div>
                                     <Button 
                                         className="w-full" 
-                                        onClick={() => navigate(`/stake?package=${pkg.id}`)}
+                                        onClick={() => navigate(`/app/aureus/stake?package=${pkg.id}`)}
                                         disabled={isPaused}
                                     >
                                         Stake Now

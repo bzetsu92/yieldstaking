@@ -162,3 +162,39 @@ When paused:
 
 - `stake`, `claim`, `withdraw` are disabled
 - `emergencyWithdraw` is allowed (Operator only)
+
+# Verify
+
+
+MockUSDT: 0x916a38BFf7a7fdA1A25EaEF64345172C04c2bdb2
+Aureus: 0x87b82b039E9F6a919cE5aE17DBE66Fad091F15b9
+YieldStaking: 0x2d58F549ce83D5125d198e1ef36e2E7c1fF6bc6F
+Admin: 0x237Dee4c976E3c4861fE6a99fBa1D60f0E72F464
+Operator: 0xe4101FF2B8097BB4346cBab3aD4E7b40EF370460
+
+---
+
+npx hardhat verify --network sepolia 0x2d58F549ce83D5125d198e1ef36e2E7c1fF6bc6F \
+  --contract "contracts/YieldStaking.sol:YieldStaking" \
+  0x237Dee4c976E3c4861fE6a99fBa1D60f0E72F464 0xe4101FF2B8097BB4346cBab3aD4E7b40EF370460 \
+  0x87b82b039E9F6a919cE5aE17DBE66Fad091F15b9 0x916a38BFf7a7fdA1A25EaEF64345172C04c2bdb2
+
+https://sepolia.etherscan.io/address/0x2d58F549ce83D5125d198e1ef36e2E7c1fF6bc6F#code
+
+---
+
+npx hardhat verify --network sepolia 0x87b82b039E9F6a919cE5aE17DBE66Fad091F15b9 \
+  --contract "contracts/Aureus.sol:Aureus" \
+  0x237Dee4c976E3c4861fE6a99fBa1D60f0E72F464
+
+https://sepolia.etherscan.io/address/0x87b82b039E9F6a919cE5aE17DBE66Fad091F15b9#code
+
+
+---
+
+npx hardhat verify --network sepolia 0x916a38BFf7a7fdA1A25EaEF64345172C04c2bdb2 \
+  --contract "contracts/mock/USDT.sol:MockUSDT" \
+  0x237Dee4c976E3c4861fE6a99fBa1D60f0E72F464
+
+https://sepolia.etherscan.io/address/0x916a38BFf7a7fdA1A25EaEF64345172C04c2bdb2#code
+

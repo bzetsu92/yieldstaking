@@ -1,10 +1,12 @@
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
+import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
+import hardhatVerify from "@nomicfoundation/hardhat-verify";
+import { configVariable, defineConfig } from "hardhat/config";
 import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const config: HardhatUserConfig = {
+export default defineConfig({
+    plugins: [hardhatToolboxMochaEthersPlugin, hardhatVerify],
     solidity: {
         version: "0.8.25",
         settings: {
@@ -15,29 +17,27 @@ const config: HardhatUserConfig = {
         },
     },
     networks: {
-        localhost: {
-            url: "http://127.0.0.1:8545",
-            chainId: 31337,
+        hardhatMainnet: {
+            type: "edr-simulated",
+            chainType: "l1",
         },
-        hardhat: {
-            chainId: 31337,
-            allowBlocksWithSameTimestamp: true,
+        hardhatOp: {
+            type: "edr-simulated",
+            chainType: "op",
         },
         sepolia: {
-            url: "https://sepolia.infura.io/v3/d6b88b54f02148b5b7e56c0c85364a3d",
-            chainId: 11155111,
-            accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-        },
-        mainnet: {
-            url: process.env.MAINNET_RPC_URL || "https://eth.llamarpc.com",
-            chainId: 1,
-            accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+            type: "http",
+            chainType: "l1",
+            url: configVariable("SEPOLIA_RPC_URL") || "https://sepolia.infura.io/v3/d6b88b54f02148b5b7e56c0c85364a3d",
+            accounts: [configVariable("PRIVATE_KEY")],
         }
     },
-    etherscan: {
-        apiKey: {
-            sepolia: process.env.ETHERSCAN_API_KEY || "",
-            mainnet: process.env.ETHERSCAN_API_KEY || ""
+    verify: {
+        etherscan: {
+            apiKey: configVariable("ETHERSCAN_API_KEY"),
+        },
+        blockscout: {
+            enabled: false,
         }
     },
     paths: {
@@ -45,12 +45,5 @@ const config: HardhatUserConfig = {
         tests: "./test",
         cache: "./cache",
         artifacts: "./artifacts",
-    },
-    typechain: {
-        outDir: "typechain-types",
-        target: "ethers-v6",
     }
-};
-
-export default config;
-
+});

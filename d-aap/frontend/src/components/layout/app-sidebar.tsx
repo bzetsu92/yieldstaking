@@ -24,20 +24,20 @@ const teams = [
 const userNavItems = [
     {
         title: 'Yield Staking',
-        url: '/app/aureus',
+        url: '/app/yield-staking',
         icon: Sparkles,
         items: [
             {
                 title: 'Stake',
-                url: '/app/aureus',
+                url: '/app/stake',
             },
             {
                 title: 'Withdrawals',
-                url: '/app/aureus/withdrawals',
+                url: '/app/withdrawals',
             },
             {
                 title: 'Reward History',
-                url: '/app/aureus/reward-history',
+                url: '/app/reward-history',
             },
         ],
     },

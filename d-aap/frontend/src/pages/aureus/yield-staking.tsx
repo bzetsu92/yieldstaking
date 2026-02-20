@@ -131,7 +131,7 @@ export default function YieldStakingPage() {
                                     </div>
                                     <Button 
                                         className="w-full" 
-                                        onClick={() => navigate(`/app/aureus/stake?package=${pkg.id}`)}
+                                        onClick={() => navigate(`/app/stake?package=${pkg.id}`)}
                                         disabled={isPaused}
                                     >
                                         Stake Now

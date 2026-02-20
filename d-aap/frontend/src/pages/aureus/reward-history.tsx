@@ -32,7 +32,7 @@ export default function RewardHistoryPage() {
     const { isConnected } = useAccount();
     const chainId = useChainId() || DEFAULT_CHAIN_ID;
 
-    const { packages, tokenDecimals, stakingAddress } = useYieldStaking();
+    const { packages, tokenDecimals, stakingAddress, tokenSymbol } = useYieldStaking();
 
     const stakesData = packages.map(pkg => {
         const { stakes } = useUserStakes(pkg.id);
@@ -90,6 +90,7 @@ export default function RewardHistoryPage() {
                 data={tableData} 
                 explorerUrl={explorerUrl}
                 contractAddress={stakingAddress}
+                tokenSymbol={tokenSymbol}
             />
         </div>
     );

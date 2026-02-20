@@ -48,6 +48,7 @@ export default function StakePage() {
         tokenBalanceRaw,
         tokenAllowance,
         tokenDecimals,
+        tokenSymbol,
         minStakeAmount,
         totalLocked,
         isPaused,
@@ -162,7 +163,7 @@ export default function StakePage() {
             <div className="flex flex-1 items-center justify-center p-4">
                 <div className="w-full max-w-lg rounded-2xl bg-card border p-8 text-center space-y-6">
                     <h1 className="text-2xl font-bold">Connect Wallet</h1>
-                    <p className="text-muted-foreground">Please connect your wallet to stake AUR</p>
+                    <p className="text-muted-foreground">Please connect your wallet to stake {tokenSymbol}</p>
                     <WalletDisplay />
                 </div>
             </div>
@@ -245,12 +246,12 @@ export default function StakePage() {
                                         <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center text-white font-bold text-[8px]">
                                             A
                                         </div>
-                                        <span className="text-sm font-medium">AUR</span>
+                                        <span className="text-sm font-medium">{tokenSymbol}</span>
                                     </div>
                                 </div>
                             </div>
                             <div className="text-xs text-muted-foreground">
-                                Min: {parseFloat(minStakeAmount).toLocaleString()} AUR
+                                Min: {parseFloat(minStakeAmount).toLocaleString()} {tokenSymbol}
                             </div>
 
                             <div className="space-y-2">
@@ -288,15 +289,15 @@ export default function StakePage() {
                                         {step === 'approve' ? 'Approving...' : 'Staking...'}
                                     </>
                                 ) : needsApproval ? (
-                                    'Approve AUR'
+                                    `Approve ${tokenSymbol}`
                                 ) : (
                                     'STAKE'
                                 )}
                             </Button>
 
-                            {parseFloat(amount) > 0 && !canStake && (
+                                    {parseFloat(amount) > 0 && !canStake && (
                                 <div className="text-center text-xs text-destructive">
-                                    {amountWei > tokenBalanceRaw ? 'Insufficient balance' : `Minimum stake: ${minStakeAmount} AUR`}
+                                    {amountWei > tokenBalanceRaw ? 'Insufficient balance' : `Minimum stake: ${minStakeAmount} ${tokenSymbol}`}
                                 </div>
                             )}
 
@@ -306,12 +307,12 @@ export default function StakePage() {
                                     <span className="font-medium">
                                         {amount && parseFloat(amount) > 0 
                                             ? (parseFloat(amount) + parseFloat(estimatedReward)).toFixed(2) 
-                                            : '0.0'} AUR
+                                            : '0.0'} {tokenSymbol}
                                     </span>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">Exchange rate</span>
-                                    <span className="font-medium">1 AUR = 1 AUR</span>
+                                    <span className="font-medium">1 {tokenSymbol} = 1 {tokenSymbol}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">Max transaction cost</span>

@@ -39,6 +39,7 @@ interface StakedPackagesTableProps {
     onSelect?: (id: string) => void;
     explorerUrl?: string;
     contractAddress?: string;
+    tokenSymbol?: string;
 }
 
 export function StakedPackagesTable({ 
@@ -46,7 +47,8 @@ export function StakedPackagesTable({
     selectedId,
     onSelect,
     explorerUrl = 'https://sepolia.etherscan.io',
-    contractAddress 
+    contractAddress,
+    tokenSymbol = 'AUR',
 }: StakedPackagesTableProps) {
     const columns: ColumnDef<StakedPackageItem>[] = React.useMemo(() => [
         {
@@ -68,7 +70,7 @@ export function StakedPackagesTable({
             accessorKey: 'stakedAmount',
             header: 'Staked',
             cell: ({ row }) => (
-                <div className="font-medium">{row.original.stakedAmount} AUR</div>
+                <div className="font-medium">{row.original.stakedAmount} {tokenSymbol}</div>
             ),
         },
         {
@@ -76,7 +78,7 @@ export function StakedPackagesTable({
             header: 'Claimable',
             cell: ({ row }) => (
                 <span className="font-medium text-green-600 dark:text-green-400">
-                    +{row.original.claimable}
+                    +{row.original.claimable} {tokenSymbol}
                 </span>
             ),
         },

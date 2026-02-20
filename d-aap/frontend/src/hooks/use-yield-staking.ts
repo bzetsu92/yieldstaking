@@ -2,7 +2,14 @@ import { useCallback, useMemo } from 'react';
 import { useAccount, useChainId, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits, formatUnits, type Address, maxUint256 } from 'viem';
 
-import { getYieldStakingContractConfig, getMockUsdtContractConfig, getYieldStakingAddress } from '@/lib/blockchain/contracts';
+import { 
+    getYieldStakingContractConfig, 
+    getYieldStakingAddress, 
+    getAureusAddress, 
+    getMockUsdtAddress, 
+    AUREUS_ABI, 
+    MOCK_USDT_ABI 
+} from '@/lib/blockchain/contracts';
 import { DEFAULT_CHAIN_ID } from '@/lib/config/chains';
 
 export interface StakePackage {
@@ -28,8 +35,20 @@ export function useYieldStaking() {
     const chainId = useChainId() || DEFAULT_CHAIN_ID;
 
     const stakingConfig = useMemo(() => getYieldStakingContractConfig(chainId), [chainId]);
-    const tokenConfig = useMemo(() => getMockUsdtContractConfig(chainId), [chainId]);
     const stakingAddress = useMemo(() => getYieldStakingAddress(chainId), [chainId]);
+
+    const { data: stakeTokenAddress } = useReadContract({
+        ...stakingConfig,
+        functionName: 'stakeToken',
+    });
+
+    const tokenConfig = useMemo(() => {
+        const aureusAddr = getAureusAddress(chainId);
+        const usdtAddr = getMockUsdtAddress(chainId);
+        const address = (stakeTokenAddress as Address | undefined) || usdtAddr;
+        const abi = address === aureusAddr ? AUREUS_ABI : MOCK_USDT_ABI;
+        return { address, abi };
+    }, [stakeTokenAddress, chainId]);
 
     const { data: totalLocked, refetch: refetchTotalLocked } = useReadContract({
         ...stakingConfig,
@@ -95,7 +114,7 @@ export function useYieldStaking() {
         return packageResults.data
             .map((result, index) => {
                 if (result.status !== 'success' || !result.result) return null;
-                const [lockPeriod, apy, enabled] = result.result as [bigint, number, boolean];
+                const [lockPeriod, apy, enabled] = result.result as unknown as [bigint, number, boolean];
                 return {
                     id: index,
                     lockPeriod,
@@ -126,7 +145,8 @@ export function useYieldStaking() {
 
     const stake = useCallback(
         async (amount: string, packageId: number) => {
-            const decimals = tokenDecimals || 6;
+            if (tokenDecimals === undefined) return;
+            const decimals = tokenDecimals;
             const amountWei = parseUnits(amount, decimals);
             writeContract({
                 ...stakingConfig,
@@ -169,6 +189,7 @@ export function useYieldStaking() {
     const decimals = tokenDecimals || 6;
 
     return {
+        isTokenReady: tokenDecimals !== undefined,
         totalLocked: totalLocked ? formatUnits(totalLocked, decimals) : '0',
         totalLockedRaw: totalLocked || BigInt(0),
         minStakeAmount: minStakeAmount ? formatUnits(minStakeAmount, decimals) : '0',
@@ -237,7 +258,7 @@ export function useUserStakes(packageId: number) {
             .map((result, index) => {
                 if (result.status !== 'success' || !result.result) return null;
                 const [balance, rewardTotal, rewardClaimed, lockPeriod, unlockTimestamp, lastClaimTimestamp] = 
-                    result.result as [bigint, bigint, bigint, bigint, bigint, bigint];
+                    result.result as unknown as [bigint, bigint, bigint, bigint, bigint, bigint];
                 
                 if (balance === BigInt(0)) return null;
 

@@ -52,6 +52,7 @@ export default function WithdrawalsPage() {
     const {
         packages,
         tokenDecimals,
+        tokenSymbol,
         stakingAddress,
         claim,
         withdraw,
@@ -154,6 +155,7 @@ export default function WithdrawalsPage() {
                         onSelect={setSelectedStake}
                         explorerUrl={explorerUrl}
                         contractAddress={stakingAddress}
+                        tokenSymbol={tokenSymbol}
                     />
                 </div>
                 <div className="lg:col-span-6">
@@ -194,25 +196,25 @@ export default function WithdrawalsPage() {
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Staked Amount</span>
                                                 <span className="font-semibold">
-                                                    {parseFloat(formatUnits(selected.balance, tokenDecimals)).toLocaleString(undefined, { maximumFractionDigits: 2 })} AUR
+                                                    {parseFloat(formatUnits(selected.balance, tokenDecimals)).toLocaleString(undefined, { maximumFractionDigits: 2 })} {tokenSymbol}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Total Rewards</span>
                                                 <span className="font-semibold">
-                                                    {parseFloat(formatUnits(selected.rewardTotal, tokenDecimals)).toFixed(4)} AUR
+                                                    {parseFloat(formatUnits(selected.rewardTotal, tokenDecimals)).toFixed(4)} {tokenSymbol}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Claimed</span>
                                                 <span className="font-semibold">
-                                                    {parseFloat(formatUnits(selected.rewardClaimed, tokenDecimals)).toFixed(4)} AUR
+                                                    {parseFloat(formatUnits(selected.rewardClaimed, tokenDecimals)).toFixed(4)} {tokenSymbol}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Claimable Now</span>
                                                 <span className="font-semibold text-green-500">
-                                                    +{parseFloat(formatUnits(selected.claimable, tokenDecimals)).toFixed(4)} AUR
+                                                    +{parseFloat(formatUnits(selected.claimable, tokenDecimals)).toFixed(4)} {tokenSymbol}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">

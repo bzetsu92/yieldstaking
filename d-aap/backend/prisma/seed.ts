@@ -25,9 +25,15 @@ async function main() {
     });
     console.log(`✅ Chain: ${sepolia.name} (${sepolia.id})`);
 
-    const contractAddress = process.env.YIELD_STAKING_ADDRESS?.toLowerCase() || '0x1234567890abcdef1234567890abcdef12345678';
-    const usdtAddress = process.env.USDT_ADDRESS?.toLowerCase() || '0xusdt0000000000000000000000000000000000';
-    const aureusAddress = process.env.AUREUS_ADDRESS?.toLowerCase() || '0xaureus00000000000000000000000000000000';
+    const contractAddress =
+        process.env.YIELD_STAKING_ADDRESS?.toLowerCase() ||
+        '0x2d58F549ce83D5125d198e1ef36e2E7c1fF6bc6F'.toLowerCase();
+    const usdtAddress =
+        process.env.USDT_ADDRESS?.toLowerCase() ||
+        '0x916a38BFf7a7fdA1A25EaEF64345172C04c2bdb2'.toLowerCase();
+    const aureusAddress =
+        process.env.AUREUS_ADDRESS?.toLowerCase() ||
+        '0x87b82b039E9F6a919cE5aE17DBE66Fad091F15b9'.toLowerCase();
 
     const stakingContract = await prisma.stakingContract.upsert({
         where: { address: contractAddress },

@@ -52,12 +52,14 @@ interface RewardHistoryTableProps {
     data: RewardHistoryItem[];
     explorerUrl?: string;
     contractAddress?: string;
+    tokenSymbol?: string;
 }
 
 export function RewardHistoryTable({ 
     data, 
     explorerUrl = 'https://sepolia.etherscan.io',
-    contractAddress 
+    contractAddress,
+    tokenSymbol = 'AUR',
 }: RewardHistoryTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -87,7 +89,7 @@ export function RewardHistoryTable({
             accessorKey: 'stakedAmount',
             header: 'Staked',
             cell: ({ row }) => (
-                <div className="font-medium">{row.original.stakedAmount} AUR</div>
+                <div className="font-medium">{row.original.stakedAmount} {tokenSymbol}</div>
             ),
         },
         {
@@ -95,7 +97,7 @@ export function RewardHistoryTable({
             header: 'Total Rewards',
             cell: ({ row }) => (
                 <span className="text-green-600 dark:text-green-400 font-medium">
-                    +{row.original.totalRewards}
+                    +{row.original.totalRewards} {tokenSymbol}
                 </span>
             ),
         },
@@ -103,7 +105,7 @@ export function RewardHistoryTable({
             accessorKey: 'claimed',
             header: 'Claimed',
             cell: ({ row }) => (
-                <span>{row.original.claimed} AUR</span>
+                <span>{row.original.claimed} {tokenSymbol}</span>
             ),
         },
         {
@@ -111,7 +113,7 @@ export function RewardHistoryTable({
             header: 'Pending',
             cell: ({ row }) => (
                 <span className="font-medium text-green-600 dark:text-green-400">
-                    +{row.original.pending}
+                    +{row.original.pending} {tokenSymbol}
                 </span>
             ),
         },

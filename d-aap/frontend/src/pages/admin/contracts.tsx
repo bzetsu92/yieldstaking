@@ -229,7 +229,7 @@ export default function AdminContractsPage() {
                                     <Wallet className="h-5 w-5 text-blue-500" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-muted-foreground">Total Locked</div>
+                                    <div className="text-sm text-muted-foreground">Total Liquidity</div>
                                     <div className="text-xl font-bold">
                                         {formatAmount(contract.totalLocked, contract.stakeTokenDecimals)} {contract.stakeTokenSymbol}
                                     </div>

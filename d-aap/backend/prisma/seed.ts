@@ -1,4 +1,5 @@
 import { PrismaClient, TransactionType, TransactionStatus } from '@prisma/client';
+import { ethers } from 'ethers';
 
 const prisma = new PrismaClient();
 const isProd = process.env.NODE_ENV === 'production';
@@ -9,8 +10,6 @@ const toTokenAmount = (amount: number, decimals: number) =>
     BigInt(Math.floor(amount * Math.pow(10, decimals))).toString();
 
 async function main() {
-    console.log(`🌱 Starting ${isProd ? 'production' : 'development'} seed...\n`);
-
     const sepolia = await prisma.chain.upsert({
         where: { id: 11155111 },
         update: {},
@@ -23,17 +22,22 @@ async function main() {
             isActive: true,
         },
     });
-    console.log(`✅ Chain: ${sepolia.name} (${sepolia.id})`);
 
-    const contractAddress =
-        process.env.YIELD_STAKING_ADDRESS?.toLowerCase() ||
-        '0x2d58F549ce83D5125d198e1ef36e2E7c1fF6bc6F'.toLowerCase();
-    const usdtAddress =
-        process.env.USDT_ADDRESS?.toLowerCase() ||
-        '0x916a38BFf7a7fdA1A25EaEF64345172C04c2bdb2'.toLowerCase();
-    const aureusAddress =
-        process.env.AUREUS_ADDRESS?.toLowerCase() ||
-        '0x87b82b039E9F6a919cE5aE17DBE66Fad091F15b9'.toLowerCase();
+    const getEnvAddress = (key: string): string => {
+        const raw = process.env[key];
+        if (!raw) {
+            throw new Error(`Missing environment variable: ${key}`);
+        }
+        const addr = raw.trim();
+        if (!ethers.isAddress(addr)) {
+            throw new Error(`Invalid address for ${key}: ${addr}`);
+        }
+        return addr.toLowerCase();
+    };
+
+    const contractAddress = getEnvAddress('YIELD_STAKING_ADDRESS');
+    const usdtAddress = getEnvAddress('USDT_ADDRESS');
+    const aureusAddress = getEnvAddress('AUREUS_ADDRESS');
 
     const stakingContract = await prisma.stakingContract.upsert({
         where: { address: contractAddress },
@@ -54,7 +58,6 @@ async function main() {
             isPaused: false,
         },
     });
-    console.log(`✅ Staking Contract: ${stakingContract.address}`);
 
     const packagesData = [
         { packageId: 0, lockPeriod: 90 * 86400, apy: 2000 },
@@ -86,7 +89,6 @@ async function main() {
             },
         });
         packages[pkg.packageId] = created;
-        console.log(`   📦 Package ${pkg.packageId}: ${pkg.lockPeriod / 86400} days, ${pkg.apy / 100}% APY`);
     }
 
     const bcrypt = await import('bcrypt');
@@ -106,7 +108,6 @@ async function main() {
             emailVerifiedAt: new Date(),
         },
     });
-    console.log(`✅ Admin: ${adminUser.email}`);
 
     if (isProd) {
         const prodUser = await prisma.user.upsert({
@@ -123,7 +124,6 @@ async function main() {
                 emailVerifiedAt: new Date(),
             },
         });
-        console.log(`✅ User: ${prodUser.email}`);
 
         console.log('\n🎉 Production seed completed!');
         console.log('━'.repeat(40));
@@ -175,10 +175,8 @@ async function main() {
         });
 
         users.push({ user, wallet });
-        console.log(`   👤 ${user.name} (${wallet.walletAddress.slice(0, 10)}...)`);
     }
 
-    console.log('\n📊 Creating stake positions and transactions...');
 
     const now = new Date();
     let stakeIdCounter = 0;
@@ -332,7 +330,6 @@ async function main() {
             lastSyncAt: now,
         },
     });
-    console.log('✅ Blockchain sync record created');
 
     const eventNames = ['Staked', 'Claimed', 'Withdrawn', 'PackageUpdated'];
     for (let i = 0; i < 20; i++) {
@@ -353,7 +350,6 @@ async function main() {
             },
         });
     }
-    console.log('✅ 20 sample blockchain events created');
 
     const summary = await prisma.$transaction([
         prisma.user.count(),

@@ -20,7 +20,7 @@ export function serializeEventData(
 }
 
 export function normalizeAddress(address: string): string {
-    return address.toLowerCase();
+    return (address || "").trim().toLowerCase();
 }
 
 export function toNumber(value: string | bigint): number {

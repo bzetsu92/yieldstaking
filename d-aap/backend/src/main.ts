@@ -156,10 +156,8 @@ async function bootstrap() {
     const port = process.env.PORT || 3000;
     await app.listen(port);
 
-    console.log(
-        `🚀 Yield Staking Backend running on: http://localhost:${port}`,
-    );
-    console.log(`📚 Swagger docs available at: http://localhost:${port}/docs`);
+    console.log(`Yield Staking Backend running on: http://localhost:${port}`);
+    console.log(`Swagger docs available at: http://localhost:${port}/docs`);
 
     process.on("SIGTERM", async () => {
         await app.close();

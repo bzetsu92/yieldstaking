@@ -114,7 +114,14 @@ export class BlockchainEventListenerService
 
         for (const contract of contracts) {
             try {
-                await this.startListening(contract.chainId, contract.address);
+                const addr = (contract.address || "").trim();
+                if (!ethers.isAddress(addr)) {
+                    this.logger.error(
+                        `Invalid contract address "${contract.address}" for chain ${contract.chainId}, skipping`,
+                    );
+                    continue;
+                }
+                await this.startListening(contract.chainId, addr);
             } catch (error) {
                 this.logger.error(
                     `Failed to start listening for contract ${contract.address}:`,
@@ -131,6 +138,10 @@ export class BlockchainEventListenerService
         }
 
         const normalizedAddress = normalizeAddress(contractAddress);
+        const addr = (normalizedAddress || "").trim();
+        if (!ethers.isAddress(addr)) {
+            throw new Error(`Invalid contract address "${contractAddress}"`);
+        }
 
         // Get or create sync record
         let sync = await this.prisma.blockchainSync.findUnique({
@@ -175,8 +186,6 @@ export class BlockchainEventListenerService
         );
 
         let lastBlockProcessed = currentBlock;
-        const intervalKey = `${chainId}-${normalizedAddress}`;
-
         const blockInterval = setInterval(async () => {
             try {
                 const latestBlock =
@@ -187,11 +196,7 @@ export class BlockchainEventListenerService
                         block <= latestBlock;
                         block++
                     ) {
-                        await this.processNewBlock(
-                            chainId,
-                            normalizedAddress,
-                            block,
-                        );
+                        await this.processNewBlock(chainId, addr, block);
                     }
                     lastBlockProcessed = latestBlock;
                 }
@@ -296,12 +301,20 @@ export class BlockchainEventListenerService
         const circuitBreaker = this.circuitBreakers.get(chainId);
         if (!provider || !circuitBreaker) return;
 
+        const addr = (contractAddress || "").trim();
+        if (!ethers.isAddress(addr)) {
+            this.logger.error(
+                `Invalid contract address "${contractAddress}" provided to scanner, skipping logs for blocks ${fromBlock}-${toBlock}`,
+            );
+            return;
+        }
+
         try {
             const logs = await circuitBreaker.execute(() =>
                 retryWithBackoff(
                     () =>
                         provider.getLogs({
-                            address: contractAddress,
+                            address: addr,
                             fromBlock,
                             toBlock,
                         }),

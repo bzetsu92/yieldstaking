@@ -187,17 +187,17 @@ export default function StakePage() {
                                         Stake your tokens and earn competitive yields based on your lock period.
                                     </p>
                                     <p className="text-sm text-slate-400">
-                                        Current staking rewards are available through the end of Q1. <Link to="/app/yield-staking" className="text-primary hover:underline">Check details here</Link>.
+                                        Current staking rewards are available through the end of Q1. <Link to="/app/stake" className="text-primary hover:underline">Check details here</Link>.
                                     </p>
                                 </div>
                                 <div className="text-right bg-slate-800/50 rounded-lg p-4 min-w-[140px]">
                                     <div className="text-xs text-slate-400 flex items-center justify-center gap-1 mb-1">
-                                        Total Locked
+                                        Total Liquidity
                                     </div>
                                     <div className="text-2xl font-bold text-white">
                                         {parseFloat(totalLocked).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                     </div>
-                                    <div className="text-xs text-slate-400">AUR</div>
+                                    <div className="text-xs text-slate-400">{tokenSymbol}</div>
                                 </div>
                             </div>
 

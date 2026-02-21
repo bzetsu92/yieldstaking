@@ -1,6 +1,8 @@
 import { useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAccount, useChainId, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseUnits, formatUnits, type Address, maxUint256 } from 'viem';
+import { parseUnits, formatUnits, type Address, maxUint256, BaseError, ContractFunctionRevertedError } from 'viem';
+import { createPublicClientForChain } from '@/lib/blockchain/client';
 
 import { 
     getYieldStakingContractConfig, 
@@ -49,6 +51,18 @@ export function useYieldStaking() {
         const abi = address === aureusAddr ? AUREUS_ABI : MOCK_USDT_ABI;
         return { address, abi };
     }, [stakeTokenAddress, chainId]);
+
+    const { data: rewardTokenAddress } = useReadContract({
+        ...stakingConfig,
+        functionName: 'rewardToken',
+    });
+
+    const rewardTokenConfig = useMemo(() => {
+        const aureusAddr = getAureusAddress(chainId);
+        const address = (rewardTokenAddress as Address | undefined) || aureusAddr;
+        const abi = address === aureusAddr ? AUREUS_ABI : MOCK_USDT_ABI;
+        return { address, abi };
+    }, [rewardTokenAddress, chainId]);
 
     const { data: totalLocked, refetch: refetchTotalLocked } = useReadContract({
         ...stakingConfig,
@@ -101,6 +115,16 @@ export function useYieldStaking() {
         functionName: 'symbol',
     });
 
+    const { data: rewardTokenDecimals } = useReadContract({
+        ...rewardTokenConfig,
+        functionName: 'decimals',
+    });
+
+    const { data: rewardSymbol } = useReadContract({
+        ...rewardTokenConfig,
+        functionName: 'symbol',
+    });
+
     const packageResults = useReadContracts({
         contracts: [0, 1, 2, 3].map((id) => ({
             ...stakingConfig,
@@ -134,13 +158,22 @@ export function useYieldStaking() {
     const approve = useCallback(
         async (amount?: bigint) => {
             const approveAmount = amount || maxUint256;
+            const publicClient = createPublicClientForChain(chainId as typeof DEFAULT_CHAIN_ID);
+            const simulation = await publicClient.simulateContract({
+                ...tokenConfig,
+                functionName: 'approve',
+                args: [stakingAddress, approveAmount],
+                account: address as Address,
+            });
+            const gas = simulation.request.gas && simulation.request.gas > 1_000_000n ? 1_000_000n : simulation.request.gas || 500_000n;
             writeContract({
                 ...tokenConfig,
                 functionName: 'approve',
                 args: [stakingAddress, approveAmount],
+                gas,
             });
         },
-        [writeContract, tokenConfig, stakingAddress]
+        [writeContract, tokenConfig, stakingAddress, chainId, address]
     );
 
     const stake = useCallback(
@@ -148,35 +181,105 @@ export function useYieldStaking() {
             if (tokenDecimals === undefined) return;
             const decimals = tokenDecimals;
             const amountWei = parseUnits(amount, decimals);
-            writeContract({
-                ...stakingConfig,
-                functionName: 'stake',
-                args: [amountWei, packageId],
-            });
+            if (isPaused) {
+                throw new Error('Contract is paused');
+            }
+            if (minStakeAmount !== undefined && amountWei < (minStakeAmount as bigint)) {
+                throw new Error('Amount below minimum stake');
+            }
+            if (
+                maxStakePerUser !== undefined &&
+                userTotalStakes !== undefined &&
+                (userTotalStakes as bigint) + amountWei > (maxStakePerUser as bigint)
+            ) {
+                throw new Error('Exceeds maximum stake per user');
+            }
+            if (tokenAllowance !== undefined && (tokenAllowance as bigint) < amountWei) {
+                throw new Error('Insufficient allowance. Please approve first');
+            }
+            const publicClient = createPublicClientForChain(chainId as typeof DEFAULT_CHAIN_ID);
+            try {
+                const simulation = await publicClient.simulateContract({
+                    ...stakingConfig,
+                    functionName: 'stake',
+                    args: [amountWei, packageId],
+                    account: address as Address,
+                });
+                const gas = simulation.request.gas && simulation.request.gas > 1_000_000n ? 1_000_000n : simulation.request.gas || 700_000n;
+                writeContract({
+                    ...stakingConfig,
+                    functionName: 'stake',
+                    args: [amountWei, packageId],
+                    gas,
+                });
+            } catch (err) {
+                if (err instanceof BaseError) {
+                    const revertError = err.walk(e => e instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | undefined;
+                    const reason = revertError?.data?.errorName || revertError?.shortMessage || 'Transaction reverted';
+                    throw new Error(reason);
+                }
+                throw err as Error;
+            }
         },
-        [writeContract, stakingConfig, tokenDecimals]
+        [writeContract, stakingConfig, tokenDecimals, chainId, address, isPaused, minStakeAmount, maxStakePerUser, userTotalStakes, tokenAllowance]
     );
 
     const claim = useCallback(
         async (packageId: number, stakeId: number) => {
-            writeContract({
-                ...stakingConfig,
-                functionName: 'claim',
-                args: [packageId, stakeId],
-            });
+            const publicClient = createPublicClientForChain(chainId as typeof DEFAULT_CHAIN_ID);
+            try {
+                const simulation = await publicClient.simulateContract({
+                    ...stakingConfig,
+                    functionName: 'claim',
+                    args: [packageId, stakeId],
+                    account: address as Address,
+                });
+                const gas = simulation.request.gas && simulation.request.gas > 900_000n ? 900_000n : simulation.request.gas || 600_000n;
+                writeContract({
+                    ...stakingConfig,
+                    functionName: 'claim',
+                    args: [packageId, stakeId],
+                    gas,
+                });
+            } catch (err) {
+                if (err instanceof BaseError) {
+                    const revertError = err.walk(e => e instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | undefined;
+                    const reason = revertError?.data?.errorName || revertError?.shortMessage || 'Transaction reverted';
+                    throw new Error(reason);
+                }
+                throw err as Error;
+            }
         },
-        [writeContract, stakingConfig]
+        [writeContract, stakingConfig, chainId, address]
     );
 
     const withdraw = useCallback(
         async (packageId: number, stakeId: number) => {
-            writeContract({
-                ...stakingConfig,
-                functionName: 'withdraw',
-                args: [packageId, stakeId],
-            });
+            const publicClient = createPublicClientForChain(chainId as typeof DEFAULT_CHAIN_ID);
+            try {
+                const simulation = await publicClient.simulateContract({
+                    ...stakingConfig,
+                    functionName: 'withdraw',
+                    args: [packageId, stakeId],
+                    account: address as Address,
+                });
+                const gas = simulation.request.gas && simulation.request.gas > 1_000_000n ? 1_000_000n : simulation.request.gas || 800_000n;
+                writeContract({
+                    ...stakingConfig,
+                    functionName: 'withdraw',
+                    args: [packageId, stakeId],
+                    gas,
+                });
+            } catch (err) {
+                if (err instanceof BaseError) {
+                    const revertError = err.walk(e => e instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | undefined;
+                    const reason = revertError?.data?.errorName || revertError?.shortMessage || 'Transaction reverted';
+                    throw new Error(reason);
+                }
+                throw err as Error;
+            }
         },
-        [writeContract, stakingConfig]
+        [writeContract, stakingConfig, chainId, address]
     );
 
     const refetchAll = useCallback(() => {
@@ -201,6 +304,8 @@ export function useYieldStaking() {
         tokenAllowance: tokenAllowance || BigInt(0),
         tokenSymbol: tokenSymbol || 'USDT',
         tokenDecimals: decimals,
+        rewardTokenDecimals: rewardTokenDecimals || 18,
+        rewardSymbol: rewardSymbol || 'AUR',
         isPaused: isPaused || false,
         packages,
         stakingAddress,
@@ -234,37 +339,56 @@ export function useUserStakes(packageId: number) {
         return Array.from({ length: Number(stakeCount) }, (_, i) => i);
     }, [stakeCount]);
 
-    const { data: stakesData, refetch: refetchStakes } = useReadContracts({
-        contracts: stakeIds.map((stakeId) => ({
-            ...stakingConfig,
-            functionName: 'userStakeHistory',
-            args: address ? [address, packageId, stakeId] : undefined,
-        })),
-        query: { enabled: !!address && stakeIds.length > 0 },
-    });
-
-    const { data: claimableData, refetch: refetchClaimable } = useReadContracts({
-        contracts: stakeIds.map((stakeId) => ({
-            ...stakingConfig,
-            functionName: 'getClaimableRewardsForStake',
-            args: address ? [address, packageId, stakeId] : undefined,
-        })),
-        query: { enabled: !!address && stakeIds.length > 0 },
+    const {
+        data: fetched,
+        refetch: refetchContractsData,
+    } = useQuery({
+        queryKey: ['user-stakes', address, chainId, packageId, stakeIds],
+        enabled: !!address && stakeIds.length > 0,
+        staleTime: 15_000,
+        queryFn: async () => {
+            const client = createPublicClientForChain(chainId as typeof DEFAULT_CHAIN_ID);
+            const stakesData = await Promise.all(
+                stakeIds.map(async (stakeId) => {
+                    try {
+                        return await client.readContract({
+                            ...stakingConfig,
+                            functionName: 'userStakeHistory',
+                            args: [address as Address, packageId, stakeId],
+                        });
+                    } catch {
+                        return null;
+                    }
+                }),
+            );
+            const claimableData = await Promise.all(
+                stakeIds.map(async (stakeId) => {
+                    try {
+                        return await client.readContract({
+                            ...stakingConfig,
+                            functionName: 'getClaimableRewardsForStake',
+                            args: [address as Address, packageId, stakeId],
+                        });
+                    } catch {
+                        return BigInt(0);
+                    }
+                }),
+            );
+            return { stakesData, claimableData };
+        },
     });
 
     const stakes = useMemo<(UserStake & { claimable: bigint })[]>(() => {
-        if (!stakesData) return [];
-        return stakesData
+        if (!fetched?.stakesData) return [];
+        return fetched.stakesData
             .map((result, index) => {
-                if (result.status !== 'success' || !result.result) return null;
+                if (!result) return null;
                 const [balance, rewardTotal, rewardClaimed, lockPeriod, unlockTimestamp, lastClaimTimestamp] = 
-                    result.result as unknown as [bigint, bigint, bigint, bigint, bigint, bigint];
+                    result as unknown as [bigint, bigint, bigint, bigint, bigint, bigint];
                 
                 if (balance === BigInt(0)) return null;
 
-                const claimable = claimableData?.[index]?.status === 'success' 
-                    ? (claimableData[index].result as bigint) 
-                    : BigInt(0);
+                const claimable = fetched?.claimableData?.[index] ?? BigInt(0);
 
                 return {
                     packageId,
@@ -279,13 +403,12 @@ export function useUserStakes(packageId: number) {
                 };
             })
             .filter((stake): stake is UserStake & { claimable: bigint } => stake !== null);
-    }, [stakesData, claimableData, packageId]);
+    }, [fetched, packageId]);
 
     const refetch = useCallback(() => {
         refetchCount();
-        refetchStakes();
-        refetchClaimable();
-    }, [refetchCount, refetchStakes, refetchClaimable]);
+        refetchContractsData();
+    }, [refetchCount, refetchContractsData]);
 
     return { stakes, stakeCount: stakeCount || 0, refetch };
 }

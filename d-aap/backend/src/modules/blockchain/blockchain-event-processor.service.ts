@@ -1,7 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { TransactionType, TransactionStatus } from "@prisma/client";
 
-import { YieldStakingEventName } from "./types/blockchain-event.types";
 import { normalizeAddress } from "./utils/event-data.util";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -71,7 +70,7 @@ export class BlockchainEventProcessorService {
             const eventData = event.eventData as Record<string, any>;
 
             switch (event.eventName) {
-                case YieldStakingEventName.STAKED:
+                case "Staked":
                     await this.processStakedEvent(
                         event.chainId,
                         event.contractAddress,
@@ -80,7 +79,7 @@ export class BlockchainEventProcessorService {
                     );
                     break;
 
-                case YieldStakingEventName.CLAIMED:
+                case "Claimed":
                     await this.processClaimedEvent(
                         event.chainId,
                         event.contractAddress,
@@ -89,7 +88,7 @@ export class BlockchainEventProcessorService {
                     );
                     break;
 
-                case YieldStakingEventName.WITHDRAWN:
+                case "Withdrawn":
                     await this.processWithdrawnEvent(
                         event.chainId,
                         event.contractAddress,
@@ -98,7 +97,7 @@ export class BlockchainEventProcessorService {
                     );
                     break;
 
-                case YieldStakingEventName.EMERGENCY_WITHDRAWN:
+                case "EmergencyWithdrawn":
                     await this.processEmergencyWithdrawnEvent(
                         event.chainId,
                         event.contractAddress,
@@ -107,21 +106,21 @@ export class BlockchainEventProcessorService {
                     );
                     break;
 
-                case YieldStakingEventName.PACKAGE_UPDATED:
+                case "PackageUpdated":
                     await this.processPackageUpdatedEvent(
                         event.contractAddress,
                         eventData as PackageUpdatedEventData,
                     );
                     break;
 
-                case YieldStakingEventName.PAUSED:
+                case "Paused":
                     await this.processContractPausedEvent(
                         event.contractAddress,
                         true,
                     );
                     break;
 
-                case YieldStakingEventName.UNPAUSED:
+                case "Unpaused":
                     await this.processContractPausedEvent(
                         event.contractAddress,
                         false,

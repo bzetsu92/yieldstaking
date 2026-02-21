@@ -32,7 +32,7 @@ export default function RewardHistoryPage() {
     const { isConnected } = useAccount();
     const chainId = useChainId() || DEFAULT_CHAIN_ID;
 
-    const { packages, tokenDecimals, stakingAddress, tokenSymbol } = useYieldStaking();
+    const { packages, tokenDecimals, stakingAddress, tokenSymbol, rewardTokenDecimals, rewardSymbol } = useYieldStaking();
 
     const stakesData = packages.map(pkg => {
         const { stakes } = useUserStakes(pkg.id);
@@ -57,13 +57,13 @@ export default function RewardHistoryPage() {
             lockPeriod: formatLockPeriod(stake.lockPeriod),
             apy: stake.package?.apy || 0,
             stakedAmount: parseFloat(formatUnits(stake.balance, tokenDecimals)).toLocaleString(undefined, { maximumFractionDigits: 2 }),
-            totalRewards: parseFloat(formatUnits(stake.rewardTotal, tokenDecimals)).toFixed(4),
-            claimed: parseFloat(formatUnits(stake.rewardClaimed, tokenDecimals)).toFixed(4),
-            pending: parseFloat(formatUnits(stake.claimable, tokenDecimals)).toFixed(4),
+            totalRewards: parseFloat(formatUnits(stake.rewardTotal, rewardTokenDecimals)).toFixed(4),
+            claimed: parseFloat(formatUnits(stake.rewardClaimed, rewardTokenDecimals)).toFixed(4),
+            pending: parseFloat(formatUnits(stake.claimable, rewardTokenDecimals)).toFixed(4),
             lastClaim: formatDate(stake.lastClaimTimestamp),
             status: isUnlocked(stake.unlockTimestamp) ? 'unlocked' : 'active',
         })),
-        [allStakes, tokenDecimals]
+        [allStakes, tokenDecimals, rewardTokenDecimals]
     );
 
     const explorerUrl = EXPLORER_ENDPOINTS[chainId] || EXPLORER_ENDPOINTS[DEFAULT_CHAIN_ID];
@@ -90,7 +90,8 @@ export default function RewardHistoryPage() {
                 data={tableData} 
                 explorerUrl={explorerUrl}
                 contractAddress={stakingAddress}
-                tokenSymbol={tokenSymbol}
+                stakeSymbol={tokenSymbol}
+                rewardSymbol={rewardSymbol}
             />
         </div>
     );

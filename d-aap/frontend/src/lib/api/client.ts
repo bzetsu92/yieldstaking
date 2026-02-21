@@ -30,9 +30,8 @@ const getRetryDelay = (attempt: number): number => {
 };
 
 const createApiClient = (): AxiosInstance => {
-    const baseURL = publicEnv.API_URL.endsWith('/api')
-        ? publicEnv.API_URL
-        : `${publicEnv.API_URL}/api`;
+    const apiUrl = publicEnv.API_URL.replace(/\/+$/, '');
+    const baseURL = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
     
     const client = axios.create({
         baseURL,

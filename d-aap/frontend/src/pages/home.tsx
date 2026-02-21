@@ -645,7 +645,7 @@ export default function HomePage() {
                                 { 
                                     phase: 'Q1 2026',
                                     season: 'Spring',
-                                    seasonVi: 'Xuân',
+                                    seasonVi: '-',
                                     title: 'Launch & Foundation', 
                                     items: ['Platform launch', 'Initial validator set', 'Core staking features'],
                                     status: 'completed',
@@ -661,7 +661,7 @@ export default function HomePage() {
                                 { 
                                     phase: 'Q2 2026',
                                     season: 'Summer',
-                                    seasonVi: 'Hạ',
+                                    seasonVi: '-',
                                     title: 'Expansion', 
                                     items: ['Multi-chain support', 'Enhanced security', 'Governance framework'],
                                     status: 'in-progress',
@@ -677,7 +677,7 @@ export default function HomePage() {
                                 { 
                                     phase: 'Q3 2026',
                                     season: 'Fall',
-                                    seasonVi: 'Thu',
+                                    seasonVi: '-',
                                     title: 'Innovation', 
                                     items: ['Advanced analytics', 'Mobile app', 'API integrations'],
                                     status: 'upcoming',
@@ -693,7 +693,7 @@ export default function HomePage() {
                                 { 
                                     phase: 'Q4 2026',
                                     season: 'Winter',
-                                    seasonVi: 'Đông',
+                                    seasonVi: '-',
                                     title: 'Ecosystem Growth', 
                                     items: ['Partner integrations', 'Community programs', 'Global expansion'],
                                     status: 'upcoming',

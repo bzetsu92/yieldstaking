@@ -53,6 +53,8 @@ export default function WithdrawalsPage() {
         packages,
         tokenDecimals,
         tokenSymbol,
+        rewardTokenDecimals,
+        rewardSymbol,
         stakingAddress,
         claim,
         withdraw,
@@ -86,12 +88,12 @@ export default function WithdrawalsPage() {
             lockPeriod: formatLockPeriod(stake.lockPeriod),
             apy: stake.package?.apy || 0,
             stakedAmount: parseFloat(formatUnits(stake.balance, tokenDecimals)).toLocaleString(undefined, { maximumFractionDigits: 2 }),
-            claimable: parseFloat(formatUnits(stake.claimable, tokenDecimals)).toFixed(4),
+            claimable: parseFloat(formatUnits(stake.claimable, rewardTokenDecimals)).toFixed(4),
             unlockDate: formatDate(stake.unlockTimestamp),
             timeRemaining: getTimeRemaining(stake.unlockTimestamp),
             isUnlocked: isUnlocked(stake.unlockTimestamp),
         })),
-        [allStakes, tokenDecimals]
+        [allStakes, tokenDecimals, rewardTokenDecimals]
     );
 
     const selected = useMemo(() => {
@@ -148,22 +150,23 @@ export default function WithdrawalsPage() {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-10">
-                <div className="lg:col-span-4">
+                <div className="lg:col-span-6">
                     <StakedPackagesTable 
                         data={tableData}
                         selectedId={selectedStake || (allStakes[0] ? `${allStakes[0].packageId}-${allStakes[0].stakeId}` : null)}
                         onSelect={setSelectedStake}
                         explorerUrl={explorerUrl}
                         contractAddress={stakingAddress}
-                        tokenSymbol={tokenSymbol}
+                        stakeSymbol={tokenSymbol}
+                        rewardSymbol={rewardSymbol}
                     />
                 </div>
-                <div className="lg:col-span-6">
+                <div className="lg:col-span-4">
                     <Card>
                         <CardContent className="p-6 space-y-4">
                             {selected ? (
                                 <>
-                                    <div className="rounded-xl border bg-muted/30 p-4">
+                                    <div className="rounded-xl p-4">
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center text-white font-bold text-sm">
@@ -202,19 +205,19 @@ export default function WithdrawalsPage() {
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Total Rewards</span>
                                                 <span className="font-semibold">
-                                                    {parseFloat(formatUnits(selected.rewardTotal, tokenDecimals)).toFixed(4)} {tokenSymbol}
+                                                    {parseFloat(formatUnits(selected.rewardTotal, rewardTokenDecimals)).toFixed(4)} {rewardSymbol}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Claimed</span>
                                                 <span className="font-semibold">
-                                                    {parseFloat(formatUnits(selected.rewardClaimed, tokenDecimals)).toFixed(4)} {tokenSymbol}
+                                                    {parseFloat(formatUnits(selected.rewardClaimed, rewardTokenDecimals)).toFixed(4)} {rewardSymbol}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Claimable Now</span>
                                                 <span className="font-semibold text-green-500">
-                                                    +{parseFloat(formatUnits(selected.claimable, tokenDecimals)).toFixed(4)} {tokenSymbol}
+                                                    +{parseFloat(formatUnits(selected.claimable, rewardTokenDecimals)).toFixed(4)} {rewardSymbol}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">

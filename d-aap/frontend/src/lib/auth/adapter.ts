@@ -1,7 +1,8 @@
 import { createAuthenticationAdapter } from '@rainbow-me/rainbowkit';
 import { isAddress, getAddress, recoverMessageAddress } from 'viem';
 
-import { signInWithMetaMask, logout as apiLogout } from '../api/auth';
+import { getMetaMaskNonce, signInWithMetaMask, logout as apiLogout } from '../api/auth';
+import { clearAuthStorage, storeWalletSession } from './auth';
 import { walletService } from '../wallet/wallet.service';
 import { ApiErrorHandler } from '../utils/api-error-handler';
 
@@ -26,7 +27,12 @@ const isValidCallbackUrl = (url: string): boolean => {
 export const createCustomAuthenticationAdapter = () => {
     return createAuthenticationAdapter<unknown>({
         getNonce: async () => {
-            return walletService.generateNonce();
+            try {
+                return await getMetaMaskNonce();
+            } catch (error) {
+                ApiErrorHandler.handle(error, 'metamask-nonce');
+                throw new Error('Unable to start wallet sign-in. Please try again.');
+            }
         },
 
         createMessage: ({ nonce, address, chainId }) => {
@@ -64,58 +70,52 @@ export const createCustomAuthenticationAdapter = () => {
                             signature: signature,
                             message: messageStr,
                         });
-                            
-                        if (result?.access_token) {
-                            const nonceMatch = messageStr.match(/Nonce: (.+)/);
-                            const chainIdMatch = messageStr.match(/Chain ID: (\d+)/);
-                            const chainId = chainIdMatch ? parseInt(chainIdMatch[1], 10) : 11155111;
-                            
-                            if (isNaN(chainId) || chainId <= 0) {
-                                return false;
-                            }
 
-                            const session = {
-                                address: messageAddress.toLowerCase() as `0x${string}`,
-                                chainId,
-                                signature: signature,
-                                nonce: nonceMatch?.[1] || '',
-                                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-                            };
-                            
-                            localStorage.setItem('auth_session', JSON.stringify(session));
-                            
-                            if (typeof document !== 'undefined') {
-                                const event = new CustomEvent('auth:session-updated', { 
-                                    detail: session,
-                                    bubbles: true,
-                                    cancelable: true
+                        if (!result?.access_token || !result?.refresh_token) {
+                            clearAuthStorage();
+                            return false;
+                        }
+
+                        const nonceMatch = messageStr.match(/Nonce:\s*(.+)/);
+                        const chainIdMatch = messageStr.match(/Chain ID:\s*(\d+)/);
+                        const chainId = chainIdMatch ? parseInt(chainIdMatch[1], 10) : NaN;
+                        const nonce = nonceMatch?.[1]?.trim();
+
+                        if (!nonce || Number.isNaN(chainId) || chainId <= 0) {
+                            clearAuthStorage();
+                            return false;
+                        }
+
+                        storeWalletSession({
+                            address: messageAddress,
+                            chainId,
+                            signature,
+                            nonce,
+                            expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                        });
+
+                        if (typeof window !== 'undefined' && window.location.pathname === '/login') {
+                            const callbackUrl =
+                                new URLSearchParams(window.location.search).get('callbackUrl') || '/app';
+                            if (isValidCallbackUrl(callbackUrl)) {
+                                requestAnimationFrame(() => {
+                                    window.location.replace(callbackUrl);
                                 });
-                                document.dispatchEvent(event);
-                                
-                                window.dispatchEvent(new StorageEvent('storage', {
-                                    key: 'access_token',
-                                    newValue: result.access_token,
-                                    storageArea: localStorage,
-                                }));
-                                
-                                if (typeof window !== 'undefined' && window.location.pathname === '/login') {
-                                    const callbackUrl = new URLSearchParams(window.location.search).get('callbackUrl') || '/app';
-                                    if (isValidCallbackUrl(callbackUrl)) {
-                                        requestAnimationFrame(() => {
-                                            window.location.href = callbackUrl;
-                                        });
-                                    }
-                                }
                             }
                         }
+
+                        return true;
                     } catch (backendError) {
                         ApiErrorHandler.handle(backendError, 'rainbowkit-backend-signin');
+                        clearAuthStorage();
+                        return false;
                     }
                 }
 
-                return isValid;
+                return false;
             } catch (error) {
                 ApiErrorHandler.handle(error, 'signature-verification');
+                clearAuthStorage();
                 return false;
             }
         },

@@ -5,6 +5,8 @@ import {
     Logger,
     BadRequestException,
     UnauthorizedException,
+    OnModuleDestroy,
+    OnModuleInit,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
@@ -14,14 +16,17 @@ import { ERR_MESSAGES } from "../constants/messages.constant";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
-export class MetaMaskAuthService {
+export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(MetaMaskAuthService.name);
-    private nonceStore: Map<string, { nonce: string; expiresAt: Date }> =
-        new Map();
     private readonly jwtConfig: {
         expiresIn: string;
         refreshExpiresIn: string;
     };
+    private readonly nonceTtlMs = parseInt(
+        process.env.METAMASK_NONCE_TTL_MS || String(15 * 60 * 1000),
+        10,
+    );
+    private cleanupTimer: NodeJS.Timeout | null = null;
 
     constructor(
         private prisma: PrismaService,
@@ -33,15 +38,54 @@ export class MetaMaskAuthService {
             expiresIn: jwtConfiguration?.expiresIn || "1h",
             refreshExpiresIn: jwtConfiguration?.refreshExpiresIn || "7d",
         };
-        setInterval(() => this.cleanupExpiredNonces(), 5 * 60 * 1000);
     }
 
-    async generateNonce(walletAddress: string): Promise<string> {
-        const normalizedAddress = walletAddress.toLowerCase();
-        const nonce = crypto.randomBytes(32).toString("hex");
-        const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    onModuleInit() {
+        const enabledRaw = process.env.METAMASK_NONCE_CLEANUP_ENABLED ?? "true";
+        const enabled = enabledRaw.toLowerCase() !== "false";
+        if (!enabled) {
+            this.logger.warn(
+                `Nonce cleanup disabled via METAMASK_NONCE_CLEANUP_ENABLED=${enabledRaw}`,
+            );
+            return;
+        }
 
-        this.nonceStore.set(normalizedAddress, { nonce, expiresAt });
+        // Delay the first run to avoid racing Prisma engine startup.
+        const initialDelayMs = parseInt(
+            process.env.METAMASK_NONCE_CLEANUP_INITIAL_DELAY_MS || "15000",
+            10,
+        );
+
+        const run = () => void this.cleanupExpiredNonces();
+        setTimeout(run, Math.max(0, initialDelayMs));
+
+        // Run periodically, but never crash the process if Prisma is disconnecting.
+        this.cleanupTimer = setInterval(run, 5 * 60 * 1000);
+    }
+
+    onModuleDestroy() {
+        if (this.cleanupTimer) clearInterval(this.cleanupTimer);
+        this.cleanupTimer = null;
+    }
+
+    async generateNonce(walletAddress?: string): Promise<string> {
+        const nonce = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + this.nonceTtlMs);
+        const normalizedAddress = walletAddress
+            ? walletAddress.toLowerCase()
+            : null;
+        const nonceHash = crypto
+            .createHash("sha256")
+            .update(nonce)
+            .digest("hex");
+
+        await this.prisma.walletNonce.create({
+            data: {
+                walletAddress: normalizedAddress,
+                nonceHash,
+                expiresAt,
+            },
+        });
 
         return nonce;
     }
@@ -53,6 +97,49 @@ export class MetaMaskAuthService {
     }): Promise<{ access_token: string; refresh_token: string; user: any }> {
         const normalizedAddress = data.walletAddress.toLowerCase();
 
+        // Step 1: Extract the nonce embedded in the signed message
+        const nonceMatch = data.message.match(/Nonce:\s*(\S+)/);
+        if (!nonceMatch) {
+            throw new UnauthorizedException(ERR_MESSAGES.AUTH.NONCE_INVALID);
+        }
+        const messageNonce = nonceMatch[1].trim();
+
+        const messageNonceHash = crypto
+            .createHash("sha256")
+            .update(messageNonce)
+            .digest("hex");
+
+        // Step 2: Validate nonce exists in DB, hasn't expired, and hasn't been used.
+        // Supports wallet-bound nonce (recommended) and legacy/unbound nonce rows.
+        await this.prisma.$transaction(async (tx) => {
+            const nonceRow = await tx.walletNonce.findFirst({
+                where: {
+                    nonceHash: messageNonceHash,
+                    usedAt: null,
+                    expiresAt: { gt: new Date() },
+                    OR: [
+                        { walletAddress: null },
+                        { walletAddress: normalizedAddress },
+                    ],
+                },
+                select: { id: true, walletAddress: true },
+            });
+
+            if (!nonceRow) {
+                throw new UnauthorizedException(ERR_MESSAGES.AUTH.NONCE_INVALID);
+            }
+
+            // Step 3: Invalidate nonce immediately to prevent replay attacks
+            await tx.walletNonce.update({
+                where: { id: nonceRow.id },
+                data: {
+                    usedAt: new Date(),
+                    walletAddress: nonceRow.walletAddress ?? normalizedAddress,
+                },
+            });
+        });
+
+        // Step 3: Verify cryptographic signature
         try {
             const recoveredAddress = ethers.verifyMessage(
                 data.message,
@@ -216,12 +303,24 @@ export class MetaMaskAuthService {
         };
     }
 
-    private cleanupExpiredNonces() {
+    private async cleanupExpiredNonces() {
         const now = new Date();
-        for (const [address, data] of this.nonceStore.entries()) {
-            if (data.expiresAt < now) {
-                this.nonceStore.delete(address);
-            }
+        const usedCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+        try {
+            await this.prisma.walletNonce.deleteMany({
+                where: {
+                    OR: [
+                        { expiresAt: { lt: now } },
+                        { usedAt: { lt: usedCutoff } },
+                    ],
+                },
+            });
+        } catch (error: unknown) {
+            // This can happen during startup/shutdown while Prisma engine isn't connected yet.
+            // Never let it crash the process.
+            const msg = error instanceof Error ? error.message : String(error);
+            this.logger.debug(`Nonce cleanup skipped: ${msg}`);
         }
     }
 }

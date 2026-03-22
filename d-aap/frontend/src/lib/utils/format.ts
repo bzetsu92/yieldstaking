@@ -93,3 +93,28 @@ export function formatNumberShort(
     }
     return numValue.toFixed(decimals);
 }
+
+export function formatTokenAmount(
+    value: bigint | string | number | undefined | null,
+    decimals: number,
+    maximumFractionDigits: number = 4,
+): string {
+    if (value === undefined || value === null) return '0';
+
+    let bigValue: bigint;
+    try {
+        bigValue = BigInt(value.toString());
+    } catch {
+        return '0';
+    }
+
+    const safeDivisor = BigInt(10) ** BigInt(decimals);
+    const whole = bigValue / safeDivisor;
+    const fraction = bigValue % safeDivisor;
+    const fractionText = fraction.toString().padStart(decimals, '0').slice(0, maximumFractionDigits);
+    const fractionSuffix = fractionText.replace(/0+$/, '');
+
+    return fractionSuffix.length > 0
+        ? `${whole.toLocaleString()}.${fractionSuffix}`
+        : whole.toLocaleString();
+}

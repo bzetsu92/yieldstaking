@@ -30,7 +30,7 @@ export function validateEnvironment(): ValidationResult {
     if (isProd) {
         const projectId = import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID;
         if (!projectId) {
-            warnings.push('VITE_WALLET_CONNECT_PROJECT_ID is not set. WalletConnect may not work.');
+            errors.push('Missing required environment variable: VITE_WALLET_CONNECT_PROJECT_ID');
         }
 
         if (apiUrl === 'http://localhost:3000') {

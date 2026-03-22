@@ -3,13 +3,12 @@ import { isAddress, getAddress } from 'viem';
 import { useAccount, useDisconnect } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { createAuth, isAuthenticated as checkIsAuthenticated, logout as clearLocalAuth, hasAccountAuth } from '@/lib/auth';
+import { createAuth, getAccessToken, logout as clearLocalAuth } from '@/lib/auth';
 import { logout as apiLogout } from '@/lib/api/auth';
 import { logger } from '@/lib/utils/logger';
 
 export type AuthenticationStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
-const COOKIE_NAME = 'auth_session';
 const DEBOUNCE_DELAY = 50;
 
 export function useAuthentication() {
@@ -17,7 +16,9 @@ export function useAuthentication() {
     const { disconnect } = useDisconnect();
     const { getSession, clearSession } = createAuth();
     const queryClient = useQueryClient();
-    const [status, setStatus] = useState<AuthenticationStatus>('loading');
+    const [status, setStatus] = useState<AuthenticationStatus>(() =>
+        getAccessToken() ? 'authenticated' : 'unauthenticated',
+    );
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const normalizedAddress = useMemo(() => {
@@ -31,41 +32,24 @@ export function useAuthentication() {
 
     useEffect(() => {
         const checkAuthentication = () => {
-            const hasToken = checkIsAuthenticated();
+            const hasToken = !!getAccessToken();
             const session = getSession();
 
-            let hasValidWallet = false;
+            let hasValidWalletSession = false;
             if (isConnected && normalizedAddress && session) {
                 try {
-                    hasValidWallet = session.address.toLowerCase() === normalizedAddress.toLowerCase();
+                    hasValidWalletSession =
+                        session.address.toLowerCase() === normalizedAddress.toLowerCase();
                 } catch {
-                    hasValidWallet = false;
+                    hasValidWalletSession = false;
                 }
             }
 
-            if (session && typeof document !== 'undefined') {
-                const existingCookie = document.cookie
-                    .split('; ')
-                    .find((row) => row.startsWith(`${COOKIE_NAME}=`));
-
-                if (!existingCookie && session.expiresAt > Date.now()) {
-                    const expires = new Date(session.expiresAt);
-                    const isProduction = import.meta.env.PROD;
-                    const cookieValue = encodeURIComponent(JSON.stringify(session));
-                    const cookieOptions = [
-                        `${COOKIE_NAME}=${cookieValue}`,
-                        `expires=${expires.toUTCString()}`,
-                        'path=/',
-                        isProduction ? 'Secure' : '',
-                        isProduction ? 'SameSite=Strict' : 'SameSite=Lax',
-                    ]
-                        .filter(Boolean)
-                        .join('; ');
-                    document.cookie = cookieOptions;
-                }
+            if (session && isConnected && normalizedAddress && !hasValidWalletSession) {
+                clearSession();
             }
 
-            setStatus(hasToken || session || hasValidWallet ? 'authenticated' : 'unauthenticated');
+            setStatus(hasToken ? 'authenticated' : 'unauthenticated');
         };
 
         checkAuthentication();
@@ -80,15 +64,17 @@ export function useAuthentication() {
         if (typeof document !== 'undefined') {
             document.addEventListener('auth:session-updated', handleAuthUpdate);
             document.addEventListener('auth:session-cleared', handleAuthUpdate);
+            window.addEventListener('storage', handleAuthUpdate);
             return () => {
                 if (timeoutRef.current) {
                     clearTimeout(timeoutRef.current);
                 }
                 document.removeEventListener('auth:session-updated', handleAuthUpdate);
                 document.removeEventListener('auth:session-cleared', handleAuthUpdate);
+                window.removeEventListener('storage', handleAuthUpdate);
             };
         }
-    }, [isConnected, normalizedAddress, getSession]);
+    }, [isConnected, normalizedAddress, getSession, clearSession]);
 
     const signOut = useCallback(async () => {
         const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
@@ -105,15 +91,7 @@ export function useAuthentication() {
             clearLocalAuth();
         }
 
-        if (typeof document !== 'undefined') {
-            const pastDate = new Date(0).toUTCString();
-            document.cookie = `${COOKIE_NAME}=; expires=${pastDate}; path=/;`;
-            document.cookie = `${COOKIE_NAME}=; expires=${pastDate}; path=/; domain=${window.location.hostname};`;
-        }
-
-        if (!hasAccountAuth()) {
-            disconnect();
-        }
+        disconnect();
 
         setStatus('unauthenticated');
         queryClient.clear();

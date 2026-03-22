@@ -4,6 +4,15 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, CardContent } from '@/components/ui/card';
+import { storeAuthTokens } from '@/lib/auth';
+
+const isValidCallbackUrl = (url: string): boolean => {
+    if (!url || url.startsWith('http://') || url.startsWith('https://')) {
+        return false;
+    }
+
+    return url.startsWith('/');
+};
 
 export default function AuthCallbackPage() {
     const [searchParams] = useSearchParams();
@@ -25,14 +34,19 @@ export default function AuthCallbackPage() {
             }
 
             if (accessToken && refreshToken) {
-                localStorage.setItem('access_token', accessToken);
-                localStorage.setItem('refresh_token', refreshToken);
+                storeAuthTokens({
+                    access_token: accessToken,
+                    refresh_token: refreshToken,
+                });
 
                 toast.success('Successfully signed in with Google!', {
                     description: 'Welcome back!',
                 });
 
-                const callbackUrl = searchParams.get('callbackUrl') || '/app';
+                const requestedCallbackUrl = searchParams.get('callbackUrl') || '/app';
+                const callbackUrl = isValidCallbackUrl(requestedCallbackUrl)
+                    ? requestedCallbackUrl
+                    : '/app';
                 navigate(callbackUrl);
             } else {
                 toast.error('Authentication failed', {
@@ -58,4 +72,3 @@ export default function AuthCallbackPage() {
         </div>
     );
 }
-

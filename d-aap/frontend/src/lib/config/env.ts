@@ -3,7 +3,8 @@ import { validateEnvironment } from './env-validator';
 if (import.meta.env.PROD) {
     const validation = validateEnvironment();
     if (!validation.valid) {
-        console.error('Environment validation failed:', validation.errors);
+        // Fail fast in production to avoid shipping a misconfigured bundle.
+        throw new Error(`Environment validation failed: ${validation.errors.join(', ')}`);
     }
     if (validation.warnings.length > 0) {
         console.warn('Environment warnings:', validation.warnings);

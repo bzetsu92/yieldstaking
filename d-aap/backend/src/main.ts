@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    Logger,
     RequestMethod,
     ValidationPipe,
     VersioningType,
@@ -21,9 +22,43 @@ import { TransformInterceptor } from "./interceptors/transform.interceptor";
 
 const basicAuth = require("express-basic-auth");
 
+const logger = new Logger("Bootstrap");
+
+process.on("uncaughtException", (error: Error) => {
+    logger.error(`Uncaught Exception: ${error.message}`, error.stack);
+    if (process.env.NODE_ENV === "production") {
+        process.exit(1);
+    }
+});
+
+process.on("unhandledRejection", (reason: unknown) => {
+    const msg = reason instanceof Error ? reason.message : String(reason);
+    logger.error(`Unhandled Promise Rejection: ${msg}`);
+    if (process.env.NODE_ENV === "production") {
+        process.exit(1);
+    }
+});
+
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
     const configService = app.get(ConfigService);
+
+    app.enableShutdownHooks();
+
+    if (process.env.NODE_ENV === "production") {
+        const instance: any = app.getHttpAdapter().getInstance();
+        if (typeof instance?.set === "function") {
+            instance.set("trust proxy", 1);
+        }
+    }
+
+    app.use((req: any, res: any, next: any) => {
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader("X-Frame-Options", "DENY");
+        res.setHeader("Referrer-Policy", "no-referrer");
+        res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+        next();
+    });
 
     app.useGlobalPipes(
         new ValidationPipe({
@@ -156,10 +191,16 @@ async function bootstrap() {
     const port = process.env.PORT || 3000;
     await app.listen(port);
 
-    console.log(`Yield Staking Backend running on: http://localhost:${port}`);
-    console.log(`Swagger docs available at: http://localhost:${port}/docs`);
+    logger.log(`Yield Staking Backend running on: http://localhost:${port}`);
+    if (process.env.NODE_ENV !== "production") {
+        logger.log(`Swagger docs available at: http://localhost:${port}/docs`);
+    }
 
     process.on("SIGTERM", async () => {
+        await app.close();
+    });
+
+    process.on("SIGINT", async () => {
         await app.close();
     });
 }

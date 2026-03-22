@@ -151,25 +151,39 @@ export class TransactionService {
     }
 
     async getTransactionSummary(walletAddress: string) {
-        const transactions = await this.prisma.transaction.findMany({
-            where: {
-                wallet: {
-                    walletAddress: walletAddress.toLowerCase(),
+        const normalizedAddress = walletAddress.toLowerCase();
+
+        const [totalCount, pendingCount, typeGroups] = await Promise.all([
+            this.prisma.transaction.count({
+                where: {
+                    wallet: { walletAddress: normalizedAddress },
+                    status: TransactionStatus.CONFIRMED,
                 },
-                status: TransactionStatus.CONFIRMED,
-            },
-            select: {
-                type: true,
-                amount: true,
-            },
-        });
+            }),
+            this.prisma.transaction.count({
+                where: {
+                    wallet: { walletAddress: normalizedAddress },
+                    status: TransactionStatus.PENDING,
+                },
+            }),
+            this.prisma.transaction.findMany({
+                where: {
+                    wallet: { walletAddress: normalizedAddress },
+                    status: TransactionStatus.CONFIRMED,
+                },
+                select: {
+                    type: true,
+                    amount: true,
+                },
+            }),
+        ]);
 
         let totalStaked = BigInt(0);
         let totalClaimed = BigInt(0);
         let totalWithdrawn = BigInt(0);
 
-        for (const tx of transactions) {
-            const amount = BigInt(tx.amount);
+        for (const tx of typeGroups) {
+            const amount = BigInt(tx.amount || "0");
             switch (tx.type) {
                 case TransactionType.STAKE:
                     totalStaked += amount;
@@ -184,20 +198,9 @@ export class TransactionService {
             }
         }
 
-        const pendingCount = await this.prisma.transaction.count({
-            where: {
-                wallet: {
-                    walletAddress: walletAddress.toLowerCase(),
-                },
-                status: TransactionStatus.PENDING,
-            },
-        });
-
         const recentTransactions = await this.prisma.transaction.findMany({
             where: {
-                wallet: {
-                    walletAddress: walletAddress.toLowerCase(),
-                },
+                wallet: { walletAddress: normalizedAddress },
             },
             include: {
                 chain: {
@@ -216,7 +219,7 @@ export class TransactionService {
             totalStaked: totalStaked.toString(),
             totalClaimed: totalClaimed.toString(),
             totalWithdrawn: totalWithdrawn.toString(),
-            transactionCount: transactions.length,
+            transactionCount: totalCount,
             pendingTransactions: pendingCount,
             recentTransactions: recentTransactions.map((tx) => ({
                 id: tx.id,

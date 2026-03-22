@@ -102,10 +102,16 @@ export class BlockchainService {
     }
 
     async getUnprocessedEventCount() {
+        const maxAttempts = parseInt(
+            process.env.BLOCKCHAIN_MAX_ATTEMPTS || "10",
+            10,
+        );
+        const now = new Date();
         return this.prisma.blockchainEvent.count({
             where: {
                 processed: false,
-                errorMessage: null,
+                attempts: { lt: maxAttempts },
+                OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
             },
         });
     }

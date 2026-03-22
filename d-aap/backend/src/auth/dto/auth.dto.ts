@@ -1,4 +1,10 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from "class-validator";
+import {
+    IsEmail,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    MinLength,
+} from "class-validator";
 
 export class RequestPasswordResetDto {
     @IsEmail()
@@ -14,8 +20,8 @@ export class RefreshTokenDto {
 
 export class MetaMaskNonceDto {
     @IsString()
-    @IsNotEmpty()
-    walletAddress: string;
+    @IsOptional()
+    walletAddress?: string;
 }
 
 export class MetaMaskSignInDto {
@@ -45,4 +51,3 @@ export class EmailRegisterDto {
     @MinLength(6)
     password: string;
 }
-

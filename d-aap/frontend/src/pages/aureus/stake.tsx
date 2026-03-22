@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { Loader2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
-import { parseUnits } from 'viem';
+import { parseUnits, formatUnits } from 'viem';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -37,12 +37,13 @@ export default function StakePage() {
         return leaderboardData.map((item) => ({
             rank: item.rank,
             address: `${item.walletAddress.slice(0, 6)}...${item.walletAddress.slice(-4)}`,
-            staked: Number(item.totalStaked) / 1e6,
-            rewards: (Number(item.totalStaked) / 1e6) * 0.017,
+            staked: Number(item.totalStaked) / 1e18,
+            rewards: (Number(item.totalStaked) / 1e18) * 0.017,
         }));
     }, [leaderboardData]);
 
     const {
+        isTokenReady,
         packages,
         tokenBalance,
         tokenBalanceRaw,
@@ -50,6 +51,8 @@ export default function StakePage() {
         tokenDecimals,
         tokenSymbol,
         minStakeAmount,
+        maxStakePerUser,
+        userTotalStakesRaw,
         totalLocked,
         isPaused,
         approve,
@@ -61,14 +64,7 @@ export default function StakePage() {
         refetchAll,
     } = useYieldStaking();
 
-    const DEFAULT_PACKAGES = [
-        { id: 0, lockPeriod: BigInt(90 * 86400), apy: 20, enabled: true },
-        { id: 1, lockPeriod: BigInt(180 * 86400), apy: 25, enabled: true },
-        { id: 2, lockPeriod: BigInt(270 * 86400), apy: 35, enabled: true },
-        { id: 3, lockPeriod: BigInt(360 * 86400), apy: 50, enabled: true },
-    ];
-
-    const displayPackages = packages.length > 0 ? packages : DEFAULT_PACKAGES;
+    const displayPackages = packages;
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -85,22 +81,22 @@ export default function StakePage() {
         return () => clearInterval(timer);
     }, []);
 
-    const selectedPkg = useMemo(() => 
-        displayPackages.find(p => p.id === selectedPackage) || displayPackages[0],
-        [displayPackages, selectedPackage]
-    );
+    const selectedPkg = useMemo(() => {
+        if (!displayPackages.length) return null;
+        return displayPackages.find((p) => p.id === selectedPackage) || displayPackages[0];
+    }, [displayPackages, selectedPackage]);
 
     const amountWei = useMemo(() => {
-        if (!amount || isNaN(parseFloat(amount))) return BigInt(0);
+        if (!amount || isNaN(parseFloat(amount))) return 0n;
         try {
             return parseUnits(amount, tokenDecimals);
         } catch {
-            return BigInt(0);
+            return 0n;
         }
     }, [amount, tokenDecimals]);
 
-    const needsApproval = useMemo(() => 
-        amountWei > BigInt(0) && tokenAllowance < amountWei,
+    const needsApproval = useMemo(() =>
+        amountWei > 0n && tokenAllowance < amountWei,
         [amountWei, tokenAllowance]
     );
 
@@ -109,16 +105,33 @@ export default function StakePage() {
         const principal = parseFloat(amount);
         const apy = selectedPkg.apy / 100;
         const lockDays = Number(selectedPkg.lockPeriod) / 86400;
-        const reward = principal * apy * (lockDays / 365);
-        return reward.toFixed(2);
+        return (principal * apy * (lockDays / 365)).toFixed(2);
     }, [amount, selectedPkg]);
 
-    const canStake = useMemo(() => {
-        if (!amount || parseFloat(amount) <= 0) return false;
-        if (amountWei > tokenBalanceRaw) return false;
-        if (parseFloat(amount) < parseFloat(minStakeAmount)) return false;
-        return true;
-    }, [amount, amountWei, tokenBalanceRaw, minStakeAmount]);
+    const stakeError = useMemo<string | null>(() => {
+        if (!isTokenReady || !amount || parseFloat(amount) <= 0) return null;
+        if (amountWei > tokenBalanceRaw) return 'Insufficient balance';
+        if (amountWei > 0n && amountWei < parseUnits(minStakeAmount, tokenDecimals)) {
+            return `Minimum stake: ${minStakeAmount} ${tokenSymbol}`;
+        }
+        const maxPerUser = parseUnits(maxStakePerUser, tokenDecimals);
+        if (maxPerUser > 0n && userTotalStakesRaw + amountWei > maxPerUser) {
+            const remaining = maxPerUser - userTotalStakesRaw;
+            return `Exceeds limit. Can stake up to ${formatUnits(remaining, tokenDecimals)} more ${tokenSymbol}`;
+        }
+        return null;
+    }, [isTokenReady, amount, amountWei, tokenBalanceRaw, minStakeAmount, maxStakePerUser, userTotalStakesRaw, tokenDecimals, tokenSymbol]);
+
+    const canStake = useMemo(
+        () =>
+            displayPackages.length > 0 &&
+            selectedPkg !== null &&
+            isTokenReady &&
+            !!amount &&
+            parseFloat(amount) > 0 &&
+            stakeError === null,
+        [displayPackages.length, selectedPkg, isTokenReady, amount, stakeError],
+    );
 
     useEffect(() => {
         if (isConfirmed) {
@@ -137,18 +150,34 @@ export default function StakePage() {
         }
     }, [isConfirmed, step, reset, refetchAll]);
 
-    const handleApprove = () => {
+    const handleApprove = async () => {
         setStep('approve');
-        approve();
+        try {
+            await approve();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Approval failed');
+            setStep('input');
+        }
     };
 
-    const handleStake = () => {
+    const handleStake = async () => {
         if (!selectedPkg) return;
         setStep('stake');
-        stake(amount, selectedPkg.id);
+        try {
+            await stake(amount, selectedPkg.id);
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Stake failed');
+            setStep('input');
+        }
     };
 
     const handleAction = () => {
+        if (!displayPackages.length) {
+            toast.error('Staking packages are not available', {
+                description: 'Please refresh the page or try again later.',
+            });
+            return;
+        }
         if (needsApproval) {
             handleApprove();
         } else {
@@ -157,6 +186,7 @@ export default function StakePage() {
     };
 
     const isProcessing = isWritePending || isConfirming;
+    const packagesReady = displayPackages.length > 0;
 
     if (!isConnected) {
         return (
@@ -183,7 +213,7 @@ export default function StakePage() {
                                         <Badge className="bg-green-500 text-white">Active</Badge>
                                     </div>
                                     <p className="text-sm text-slate-300 mb-3">
-                                        The <span className="font-semibold text-white">Aureus Staking Program</span> introduces a rewarding opportunity for AUR holders. 
+                                        The <span className="font-semibold text-white">Aureus Staking Program</span> introduces a rewarding opportunity for AUR holders.
                                         Stake your tokens and earn competitive yields based on your lock period.
                                     </p>
                                     <p className="text-sm text-slate-400">
@@ -227,6 +257,12 @@ export default function StakePage() {
                 <div className="lg:col-span-4 space-y-6">
                     <Card>
                         <CardContent className="p-4 space-y-4">
+                            {!packagesReady && (
+                                <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+                                    Staking packages are not available right now. This usually means the app
+                                    cannot load data from the staking contract on the current network.
+                                </div>
+                            )}
                             <div className="relative">
                                 <input
                                     type="text"
@@ -234,11 +270,13 @@ export default function StakePage() {
                                     onChange={(e) => setAmount(e.target.value)}
                                     placeholder="0.00"
                                     className="w-full h-12 px-4 pr-28 rounded-lg border-2 border-primary/50 bg-muted/30 text-lg font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/50"
+                                    disabled={!packagesReady || isProcessing}
                                 />
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                    <button 
+                                    <button
                                         className="px-2 py-0.5 text-xs font-semibold rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                                         onClick={() => setAmount(tokenBalance)}
+                                        disabled={!packagesReady || isProcessing}
                                     >
                                         MAX
                                     </button>
@@ -295,9 +333,9 @@ export default function StakePage() {
                                 )}
                             </Button>
 
-                                    {parseFloat(amount) > 0 && !canStake && (
+                            {stakeError && parseFloat(amount || '0') > 0 && (
                                 <div className="text-center text-xs text-destructive">
-                                    {amountWei > tokenBalanceRaw ? 'Insufficient balance' : `Minimum stake: ${minStakeAmount} ${tokenSymbol}`}
+                                    {stakeError}
                                 </div>
                             )}
 
@@ -305,8 +343,8 @@ export default function StakePage() {
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">You will receive</span>
                                     <span className="font-medium">
-                                        {amount && parseFloat(amount) > 0 
-                                            ? (parseFloat(amount) + parseFloat(estimatedReward)).toFixed(2) 
+                                        {amount && parseFloat(amount) > 0
+                                            ? (parseFloat(amount) + parseFloat(estimatedReward)).toFixed(2)
                                             : '0.0'} {tokenSymbol}
                                     </span>
                                 </div>
@@ -328,7 +366,6 @@ export default function StakePage() {
                             </div>
                         </CardContent>
                     </Card>
-
                 </div>
             </div>
         </div>

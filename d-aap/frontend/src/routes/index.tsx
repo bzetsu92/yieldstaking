@@ -10,6 +10,7 @@ const HomePage = lazy(() => import('@/pages/home'));
 
 // Auth pages
 const LoginPage = lazy(() => import('@/pages/auth/login'));
+const RegisterPage = lazy(() => import('@/pages/auth/register'));
 const AuthCallbackPage = lazy(() => import('@/pages/auth/callback'));
 const AuthErrorPage = lazy(() => import('@/pages/auth/error'));
 
@@ -50,6 +51,10 @@ export const routes: RouteObject[] = [
         element: <LoginPage />,
     },
     {
+        path: '/register',
+        element: <RegisterPage />,
+    },
+    {
         path: '/auth/callback',
         element: <AuthCallbackPage />,
     },
@@ -57,7 +62,6 @@ export const routes: RouteObject[] = [
         path: '/auth/error',
         element: <AuthErrorPage />,
     },
-    // App routes (with layout, requires login)
     {
         path: '/app',
         element: <AppLayout />,
@@ -151,14 +155,12 @@ export const routes: RouteObject[] = [
                     </AdminPage>
                 ),
             },
-            // Fallback - 404 page
             {
                 path: '*',
                 element: <NotFoundPage />,
             },
         ],
     },
-    // Catch-all for routes outside /app
     {
         path: '*',
         element: <NotFoundPage />,

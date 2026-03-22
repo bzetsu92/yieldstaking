@@ -8,6 +8,7 @@ import axios, {
 
 import { publicEnv } from '../config/env';
 import { PRODUCTION_CONFIG } from '../constants/production';
+import { clearAuthStorage, getAccessToken, getRefreshToken, storeAuthTokens } from '../auth/auth';
 import { ApiErrorHandler } from '../utils/api-error-handler';
 import { logger } from '../utils/logger';
 
@@ -15,6 +16,12 @@ import type { ApiResponse } from '@/interfaces';
 
 const MAX_RETRIES = PRODUCTION_CONFIG.maxRetries;
 const RETRY_DELAY = 1000;
+
+type RetriableRequestConfig = InternalAxiosRequestConfig & {
+    _retry?: boolean;
+    _retryCount?: number;
+    _skipAuthRefresh?: boolean;
+};
 
 const shouldRetry = (error: AxiosError): boolean => {
     if (!error.response) {
@@ -42,10 +49,47 @@ const createApiClient = (): AxiosInstance => {
         withCredentials: true,
     });
 
+    let refreshPromise: Promise<string | null> | null = null;
+
+    const refreshAccessToken = async (): Promise<string | null> => {
+        const refreshToken = getRefreshToken();
+
+        if (!refreshToken) {
+            return null;
+        }
+
+        if (!refreshPromise) {
+            refreshPromise = client
+                .post<ApiResponse<{ access_token: string; refresh_token: string }>>(
+                    '/v1/auth/refresh',
+                    { refreshToken },
+                    { _skipAuthRefresh: true } as AxiosRequestConfig,
+                )
+                .then((response) => {
+                    const tokens = response.data.data;
+
+                    if (!tokens?.access_token || !tokens?.refresh_token) {
+                        throw new Error('Invalid refresh token response');
+                    }
+
+                    storeAuthTokens(tokens);
+                    return tokens.access_token;
+                })
+                .catch((error: unknown) => {
+                    clearAuthStorage();
+                    throw error;
+                })
+                .finally(() => {
+                    refreshPromise = null;
+                });
+        }
+
+        return refreshPromise;
+    };
+
     client.interceptors.request.use(
         (config: InternalAxiosRequestConfig) => {
-            const token =
-                typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+            const token = getAccessToken();
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
             }
@@ -81,10 +125,7 @@ const createApiClient = (): AxiosInstance => {
             return response;
         },
         async (error: AxiosError) => {
-            const config = error.config as InternalAxiosRequestConfig & {
-                _retry?: boolean;
-                _retryCount?: number;
-            };
+            const config = error.config as RetriableRequestConfig | undefined;
 
             if (shouldRetry(error) && config && !config._retry) {
                 config._retry = true;
@@ -106,14 +147,26 @@ const createApiClient = (): AxiosInstance => {
             const handledError = ApiErrorHandler.handle(error, 'API Request');
 
             if (status === 401) {
-                logger.warn('Unauthorized request - redirecting to login');
-                if (typeof window !== 'undefined') {
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('refresh_token');
-                    localStorage.removeItem('auth_session');
-                    if (!window.location.pathname.includes('/login')) {
-                        window.location.replace('/login');
+                const isRefreshRequest = config?.url?.includes('/v1/auth/refresh');
+
+                if (config && !config._skipAuthRefresh && !config._retry && !isRefreshRequest) {
+                    try {
+                        config._retry = true;
+                        const nextAccessToken = await refreshAccessToken();
+
+                        if (nextAccessToken) {
+                            config.headers.Authorization = `Bearer ${nextAccessToken}`;
+                            return client(config);
+                        }
+                    } catch (refreshError) {
+                        logger.warn('Token refresh failed', { refreshError });
                     }
+                }
+
+                logger.warn('Unauthorized request - clearing auth state');
+                clearAuthStorage();
+                if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+                    window.location.replace('/login');
                 }
             } else if (status === 403) {
                 logger.warn('Forbidden request');

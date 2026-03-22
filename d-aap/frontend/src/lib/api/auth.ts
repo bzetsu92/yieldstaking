@@ -3,14 +3,15 @@ import { type Address, isAddress, getAddress } from 'viem';
 import { api } from './client';
 import { publicEnv } from '../config/env';
 import { handleApiError } from '../utils/api-error-handler';
+import { clearAuthStorage, storeAuthTokens } from '../auth/auth';
 
-import type { LoginRequest, LoginResponse, MetaMaskAuthResponse } from '@/interfaces';
-
-const TOKEN_STORAGE_KEYS = {
-    ACCESS_TOKEN: 'access_token',
-    REFRESH_TOKEN: 'refresh_token',
-    AUTH_SESSION: 'auth_session',
-} as const;
+import type {
+    LoginRequest,
+    LoginResponse,
+    MetaMaskAuthResponse,
+    RegisterRequest,
+    RegisterResponse,
+} from '@/interfaces';
 
 export async function loginWithEmailPassword(data: LoginRequest): Promise<LoginResponse> {
     if (!data?.email || !data?.password) {
@@ -20,11 +21,8 @@ export async function loginWithEmailPassword(data: LoginRequest): Promise<LoginR
     try {
         const result = await api.post<LoginResponse>('/v1/auth/login', data);
 
-        if (result?.access_token) {
-            localStorage.setItem(TOKEN_STORAGE_KEYS.ACCESS_TOKEN, result.access_token);
-            if (result.refresh_token) {
-                localStorage.setItem(TOKEN_STORAGE_KEYS.REFRESH_TOKEN, result.refresh_token);
-            }
+        if (result?.access_token && result?.refresh_token) {
+            storeAuthTokens(result);
         }
 
         return result;
@@ -37,16 +35,39 @@ export async function loginWithEmailPassword(data: LoginRequest): Promise<LoginR
     }
 }
 
-export async function getMetaMaskNonce(walletAddress: Address): Promise<string> {
-    if (!walletAddress || !isAddress(walletAddress)) {
-        throw new Error('Invalid wallet address');
+export async function registerWithEmailPassword(
+    data: RegisterRequest,
+): Promise<RegisterResponse> {
+    if (!data?.name?.trim()) {
+        throw new Error('Name is required');
+    }
+
+    if (!data?.email) {
+        throw new Error('Email is required');
+    }
+
+    if (!data?.password || data.password.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
     }
 
     try {
-        const normalizedAddress = getAddress(walletAddress);
-        const result = await api.post<{ nonce: string }>('/v1/auth/metamask/nonce', {
-            walletAddress: normalizedAddress,
+        return await api.post<RegisterResponse>('/v1/auth/email/register', {
+            name: data.name.trim(),
+            email: data.email.trim().toLowerCase(),
+            password: data.password,
         });
+    } catch (error: unknown) {
+        throw handleApiError({
+            error,
+            context: 'Failed to register',
+            showToast: false,
+        });
+    }
+}
+
+export async function getMetaMaskNonce(): Promise<string> {
+    try {
+        const result = await api.post<{ nonce: string }>('/v1/auth/metamask/nonce', {});
         
         if (!result?.nonce) {
             throw new Error('Invalid nonce response');
@@ -87,11 +108,8 @@ export async function signInWithMetaMask(data: {
             message: data.message,
         });
 
-        if (result?.access_token) {
-            localStorage.setItem(TOKEN_STORAGE_KEYS.ACCESS_TOKEN, result.access_token);
-            if (result.refresh_token) {
-                localStorage.setItem(TOKEN_STORAGE_KEYS.REFRESH_TOKEN, result.refresh_token);
-            }
+        if (result?.access_token && result?.refresh_token) {
+            storeAuthTokens(result);
         }
 
         return result;
@@ -114,11 +132,8 @@ export async function refreshToken(refreshToken: string): Promise<LoginResponse>
             refreshToken,
         });
 
-        if (result?.access_token) {
-            localStorage.setItem(TOKEN_STORAGE_KEYS.ACCESS_TOKEN, result.access_token);
-            if (result.refresh_token) {
-                localStorage.setItem(TOKEN_STORAGE_KEYS.REFRESH_TOKEN, result.refresh_token);
-            }
+        if (result?.access_token && result?.refresh_token) {
+            storeAuthTokens(result);
         }
 
         return result;
@@ -149,17 +164,7 @@ export async function logout(refreshToken: string | null): Promise<void> {
             showToast: false,
         });
     } finally {
-        if (typeof window !== 'undefined') {
-            Object.values(TOKEN_STORAGE_KEYS).forEach((key) => {
-                localStorage.removeItem(key);
-            });
-
-            if (typeof document !== 'undefined') {
-                const pastDate = new Date(0).toUTCString();
-                document.cookie = `${TOKEN_STORAGE_KEYS.AUTH_SESSION}=; expires=${pastDate}; path=/;`;
-                document.cookie = `${TOKEN_STORAGE_KEYS.AUTH_SESSION}=; expires=${pastDate}; path=/; domain=${window.location.hostname};`;
-            }
-        }
+        clearAuthStorage();
     }
 }
 

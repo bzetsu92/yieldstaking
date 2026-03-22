@@ -9,9 +9,13 @@ import { RPC_ENDPOINTS } from '../constants/rpc';
 export function createPublicClientForChain(chainId: PlatformChainId) {
     const chainConfig = getChainConfig(chainId);
     const rpcUrl = RPC_ENDPOINTS[chainId] || chainConfig.rpcUrls.default.http[0];
+    const transport =
+        typeof window !== 'undefined' && window.ethereum
+            ? custom(window.ethereum)
+            : http(rpcUrl);
     return createPublicClient({
         chain: chainConfig,
-        transport: http(rpcUrl),
+        transport,
     });
 }
 
@@ -29,4 +33,3 @@ export function createWalletClientForChain(chainId: PlatformChainId, account?: A
         transport: custom(window.ethereum),
     });
 }
-

@@ -9,6 +9,7 @@ import {
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { ExternalLink, Unlock, Clock } from 'lucide-react';
 
+import { formatTokenAmount } from '@/lib/utils/format';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -49,8 +50,8 @@ export function StakedPackagesTable({
     onSelect,
     explorerUrl = 'https://sepolia.etherscan.io',
     contractAddress,
-    stakeSymbol = 'USDT',
-    rewardSymbol = 'AUR',
+    stakeSymbol = 'AUR',
+    rewardSymbol = 'USDT',
 }: StakedPackagesTableProps) {
     const columns: ColumnDef<StakedPackageItem>[] = React.useMemo(() => [
         {
@@ -71,18 +72,26 @@ export function StakedPackagesTable({
         {
             accessorKey: 'stakedAmount',
             header: 'Staked',
-            cell: ({ row }) => (
-                <div className="font-medium">{row.original.stakedAmount} {stakeSymbol}</div>
-            ),
+            cell: ({ row }) => {
+                const amount = BigInt(row.original.stakedAmount || '0');
+                return (
+                    <div className="font-medium">
+                        {formatTokenAmount(amount, 18, 2)} AUR
+                    </div>
+                );
+            },
         },
         {
             accessorKey: 'claimable',
             header: 'Claimable',
-            cell: ({ row }) => (
-                <span className="font-medium text-green-600 dark:text-green-400">
-                    +{row.original.claimable} {rewardSymbol}
-                </span>
-            ),
+            cell: ({ row }) => {
+                const amount = BigInt(row.original.claimable || '0');
+                return (
+                    <span className="font-medium text-green-600 dark:text-green-400">
+                        +{formatTokenAmount(amount, 18, 4)} USDT
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'status',

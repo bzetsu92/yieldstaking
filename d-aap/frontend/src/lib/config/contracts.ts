@@ -19,13 +19,17 @@ const CONTRACT_ADDRESSES: Record<number, ContractAddresses> = {
     },
 };
 
-const DEFAULT_CHAIN_ADDRESSES = CONTRACT_ADDRESSES[CHAIN_IDS.SEPOLIA];
-
 export const getAddressForChain = (chainId?: number): ContractAddresses => {
     if (!chainId) {
-        return DEFAULT_CHAIN_ADDRESSES;
+        throw new Error('chainId is required to resolve contract addresses');
     }
-    return CONTRACT_ADDRESSES[chainId] || DEFAULT_CHAIN_ADDRESSES;
+
+    const addresses = CONTRACT_ADDRESSES[chainId];
+    if (!addresses) {
+        throw new Error(`No contract addresses configured for chain ${chainId}`);
+    }
+
+    return addresses;
 };
 
 export const getContractAddress = (chainId: number, contractName: string): Address => {

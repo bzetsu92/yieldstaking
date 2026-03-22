@@ -3,6 +3,7 @@ import { type Address, isAddress, getAddress } from 'viem';
 import { SUPPORTED_CHAINS } from '../config/chains';
 import { walletService } from '../wallet/wallet.service';
 import { ApiErrorHandler } from '../utils/api-error-handler';
+import type { LoginResponse } from '@/interfaces';
 
 export interface AuthSession {
     address: Address;
@@ -12,8 +13,91 @@ export interface AuthSession {
     expiresAt: number;
 }
 
-const SESSION_STORAGE_KEY = 'auth_session';
+export const TOKEN_STORAGE_KEYS = {
+    ACCESS_TOKEN: 'access_token',
+    REFRESH_TOKEN: 'refresh_token',
+    AUTH_SESSION: 'auth_session',
+} as const;
+
+const SESSION_STORAGE_KEY = TOKEN_STORAGE_KEYS.AUTH_SESSION;
 const SESSION_DURATION = 24 * 60 * 60 * 1000;
+
+const dispatchAuthEvent = (eventName: 'auth:session-updated' | 'auth:session-cleared', detail?: unknown) => {
+    if (typeof document === 'undefined') return;
+    document.dispatchEvent(new CustomEvent(eventName, { detail }));
+};
+
+const emitStorageLikeEvent = (key: string, newValue: string | null) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+        new StorageEvent('storage', {
+            key,
+            newValue,
+            storageArea: localStorage,
+        }),
+    );
+};
+
+const isValidSession = (value: unknown): value is AuthSession => {
+    if (!value || typeof value !== 'object') return false;
+
+    const session = value as Partial<AuthSession>;
+
+    return (
+        typeof session.address === 'string' &&
+        isAddress(session.address) &&
+        typeof session.chainId === 'number' &&
+        Number.isInteger(session.chainId) &&
+        session.chainId > 0 &&
+        typeof session.signature === 'string' &&
+        session.signature.length > 0 &&
+        typeof session.nonce === 'string' &&
+        session.nonce.length > 0 &&
+        typeof session.expiresAt === 'number' &&
+        Number.isFinite(session.expiresAt)
+    );
+};
+
+export function storeAuthTokens(tokens: Pick<LoginResponse, 'access_token' | 'refresh_token'>): void {
+    if (typeof window === 'undefined') return;
+
+    localStorage.setItem(TOKEN_STORAGE_KEYS.ACCESS_TOKEN, tokens.access_token);
+    localStorage.setItem(TOKEN_STORAGE_KEYS.REFRESH_TOKEN, tokens.refresh_token);
+
+    emitStorageLikeEvent(TOKEN_STORAGE_KEYS.ACCESS_TOKEN, tokens.access_token);
+    emitStorageLikeEvent(TOKEN_STORAGE_KEYS.REFRESH_TOKEN, tokens.refresh_token);
+    dispatchAuthEvent('auth:session-updated');
+}
+
+export function storeWalletSession(session: AuthSession): void {
+    if (typeof window === 'undefined') return;
+
+    const normalizedSession: AuthSession = {
+        ...session,
+        address: getAddress(session.address),
+    };
+
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(normalizedSession));
+    emitStorageLikeEvent(SESSION_STORAGE_KEY, JSON.stringify(normalizedSession));
+    dispatchAuthEvent('auth:session-updated', normalizedSession);
+}
+
+export function clearAuthStorage(): void {
+    if (typeof window === 'undefined') return;
+
+    Object.values(TOKEN_STORAGE_KEYS).forEach((key) => {
+        localStorage.removeItem(key);
+        emitStorageLikeEvent(key, null);
+    });
+
+    if (typeof document !== 'undefined') {
+        const pastDate = new Date(0).toUTCString();
+        document.cookie = `${TOKEN_STORAGE_KEYS.AUTH_SESSION}=; expires=${pastDate}; path=/;`;
+        document.cookie = `${TOKEN_STORAGE_KEYS.AUTH_SESSION}=; expires=${pastDate}; path=/; domain=${window.location.hostname};`;
+    }
+
+    dispatchAuthEvent('auth:session-cleared');
+}
 
 export function createAuth() {
     const signMessage = async (address: Address, chainId?: number): Promise<string> => {
@@ -45,13 +129,7 @@ export function createAuth() {
                 expiresAt: Date.now() + SESSION_DURATION,
             };
 
-            localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-
-            if (typeof document !== 'undefined') {
-                document.dispatchEvent(
-                    new CustomEvent('auth:session-updated', { detail: session }),
-                );
-            }
+            storeWalletSession(session);
 
             return signature;
         } catch (error: unknown) {
@@ -67,24 +145,35 @@ export function createAuth() {
             const sessionData = localStorage.getItem(SESSION_STORAGE_KEY);
             if (!sessionData) return null;
 
-            const session: AuthSession = JSON.parse(sessionData);
+            const session: unknown = JSON.parse(sessionData);
 
-            if (Date.now() >= session.expiresAt) {
+            if (!isValidSession(session)) {
                 localStorage.removeItem(SESSION_STORAGE_KEY);
                 return null;
             }
 
-            return session;
+            const normalizedSession: AuthSession = {
+                ...session,
+                address: getAddress(session.address),
+            };
+
+            if (Date.now() >= normalizedSession.expiresAt) {
+                localStorage.removeItem(SESSION_STORAGE_KEY);
+                return null;
+            }
+
+            return normalizedSession;
         } catch {
+            localStorage.removeItem(SESSION_STORAGE_KEY);
             return null;
         }
     };
 
     const clearSession = (): void => {
-        if (typeof window !== 'undefined') {
-            localStorage.removeItem(SESSION_STORAGE_KEY);
-            document.dispatchEvent(new CustomEvent('auth:session-cleared'));
-        }
+        if (typeof window === 'undefined') return;
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        emitStorageLikeEvent(SESSION_STORAGE_KEY, null);
+        dispatchAuthEvent('auth:session-cleared');
     };
 
     const isSessionValid = (): boolean => {
@@ -101,48 +190,23 @@ export function createAuth() {
 }
 
 export function logout() {
-    if (typeof window === 'undefined') return;
-
-    // Remove all auth-related localStorage items
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('auth_session');
-
-    if (typeof document !== 'undefined') {
-        document.cookie = 'auth_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        document.cookie = 'auth_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname + ';';
-        
-        document.dispatchEvent(new CustomEvent('auth:session-cleared'));
-        window.dispatchEvent(new StorageEvent('storage', {
-            key: 'access_token',
-            newValue: null,
-            storageArea: localStorage,
-        }));
-        window.dispatchEvent(new StorageEvent('storage', {
-            key: 'refresh_token',
-            newValue: null,
-            storageArea: localStorage,
-        }));
-        window.dispatchEvent(new StorageEvent('storage', {
-            key: 'auth_session',
-            newValue: null,
-            storageArea: localStorage,
-        }));
-    }
+    clearAuthStorage();
 }
 
 export function getAccessToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('access_token');
+    return localStorage.getItem(TOKEN_STORAGE_KEYS.ACCESS_TOKEN);
+}
+
+export function getRefreshToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(TOKEN_STORAGE_KEYS.REFRESH_TOKEN);
 }
 
 export function hasAccountAuth(): boolean {
-    if (typeof window === 'undefined') return false;
-    return !!localStorage.getItem('access_token');
+    return !!getAccessToken();
 }
 
 export function isAuthenticated(): boolean {
-    const token = getAccessToken();
-    const session = localStorage.getItem('auth_session');
-    return !!(token || session);
+    return hasAccountAuth();
 }

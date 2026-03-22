@@ -13,8 +13,8 @@ import { Response } from "express";
 import { AuthService } from "./auth.service";
 import {
     EmailRegisterDto,
-    MetaMaskNonceDto,
     MetaMaskSignInDto,
+    MetaMaskNonceDto,
     RefreshTokenDto,
     RequestPasswordResetDto,
 } from "./dto/auth.dto";
@@ -34,9 +34,9 @@ export class AuthController {
     ) {}
 
     @Post("metamask/nonce")
-    async getMetaMaskNonce(@Body() nonceDto: MetaMaskNonceDto) {
+    async getMetaMaskNonce(@Body() body: MetaMaskNonceDto) {
         const nonce = await this.metaMaskAuthService.generateNonce(
-            nonceDto.walletAddress,
+            body?.walletAddress,
         );
         return { nonce };
     }

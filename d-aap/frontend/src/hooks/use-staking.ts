@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { hasAccountAuth } from '@/lib/auth';
 
 import {
     fetchStakingContracts,
@@ -40,6 +41,7 @@ export function useMyPositions(params?: { page?: number; limit?: number }) {
         queryKey: ['staking', 'positions', 'my', params],
         queryFn: () => fetchMyPositions(params),
         staleTime: 30 * 1000,
+        enabled: hasAccountAuth(),
     });
 }
 
@@ -48,6 +50,7 @@ export function useMySummary() {
         queryKey: ['staking', 'summary', 'my'],
         queryFn: fetchMySummary,
         staleTime: 30 * 1000,
+        enabled: hasAccountAuth(),
     });
 }
 

@@ -242,10 +242,12 @@ export class StakingService {
     }
 
     async getStakePositionsSummary(walletAddress: string) {
+        const normalizedAddress = walletAddress.toLowerCase();
+        
         const positions = await this.prisma.stakePosition.findMany({
             where: {
                 wallet: {
-                    walletAddress: walletAddress.toLowerCase(),
+                    walletAddress: normalizedAddress,
                 },
                 isWithdrawn: false,
             },
@@ -266,9 +268,13 @@ export class StakingService {
         }[] = [];
 
         for (const pos of positions) {
-            totalPrincipalStaked += BigInt(pos.principal);
-            totalRewardEarned += BigInt(pos.rewardTotal);
-            totalRewardClaimed += BigInt(pos.rewardClaimed);
+            const principal = BigInt(pos.principal || "0");
+            const rewardTotal = BigInt(pos.rewardTotal || "0");
+            const rewardClaimed = BigInt(pos.rewardClaimed || "0");
+            
+            totalPrincipalStaked += principal;
+            totalRewardEarned += rewardTotal;
+            totalRewardClaimed += rewardClaimed;
 
             const claimable = this.calculateClaimableReward(
                 pos.principal,
@@ -285,9 +291,7 @@ export class StakingService {
                     positionId: pos.id,
                     unlockTimestamp: pos.unlockTimestamp,
                     principal: pos.principal,
-                    reward: (
-                        BigInt(pos.rewardTotal) - BigInt(pos.rewardClaimed)
-                    ).toString(),
+                    reward: (rewardTotal - rewardClaimed).toString(),
                 });
             }
         }

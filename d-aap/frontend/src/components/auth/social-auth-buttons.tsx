@@ -22,7 +22,10 @@ export const SocialAuthButtons = memo(function SocialAuthButtons({
     const handleGoogleAuth = () => {
         const url = getGoogleAuthUrl();
         if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-            window.location.href = url;
+            const currentPath = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '';
+            const callbackUrl = currentPath.startsWith('/login') ? '/app' : currentPath;
+            const separator = url.includes('?') ? '&' : '?';
+            window.location.href = `${url}${separator}callbackUrl=${encodeURIComponent(callbackUrl)}`;
         }
     };
 

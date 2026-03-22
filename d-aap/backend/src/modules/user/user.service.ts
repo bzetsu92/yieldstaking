@@ -159,35 +159,34 @@ export class UserService {
             this.getUserStatistics(userId),
         ]);
 
-        // Get active stake positions for this user
-        const activeStakes = await this.prisma.stakePosition.count({
-            where: {
-                wallet: { userId },
-                isWithdrawn: false,
-            },
-        });
-
-        // Get total staked across all positions
-        const stakePositions = await this.prisma.stakePosition.findMany({
-            where: {
-                wallet: { userId },
-                isWithdrawn: false,
-            },
-            select: {
-                principal: true,
-                rewardTotal: true,
-                rewardClaimed: true,
-            },
-        });
+        const [activeStakesCount, stakePositions] = await Promise.all([
+            this.prisma.stakePosition.count({
+                where: {
+                    wallet: { userId },
+                    isWithdrawn: false,
+                },
+            }),
+            this.prisma.stakePosition.findMany({
+                where: {
+                    wallet: { userId },
+                    isWithdrawn: false,
+                },
+                select: {
+                    principal: true,
+                    rewardTotal: true,
+                    rewardClaimed: true,
+                },
+            }),
+        ]);
 
         const totalActiveStaked = stakePositions.reduce(
-            (sum, pos) => sum + BigInt(pos.principal),
+            (sum, pos) => sum + BigInt(pos.principal || "0"),
             BigInt(0),
         );
 
         const totalPendingRewards = stakePositions.reduce(
             (sum, pos) =>
-                sum + (BigInt(pos.rewardTotal) - BigInt(pos.rewardClaimed)),
+                sum + (BigInt(pos.rewardTotal || "0") - BigInt(pos.rewardClaimed || "0")),
             BigInt(0),
         );
 
@@ -206,7 +205,7 @@ export class UserService {
                 totalStaked: stats.totalStaked,
                 totalClaimed: stats.totalClaimed,
                 totalWithdrawn: stats.totalWithdrawn,
-                activeStakes,
+                activeStakes: activeStakesCount,
                 completedStakes: stats.completedStakes,
                 pendingRewards: totalPendingRewards.toString(),
                 currentActiveStaked: totalActiveStaked.toString(),

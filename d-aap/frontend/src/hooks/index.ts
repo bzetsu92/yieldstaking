@@ -22,6 +22,7 @@ export {
     useGlobalStatistics,
     useLeaderboard,
 } from './use-staking';
+export { useStakingPositionsView } from './use-staking-positions';
 
 export {
     usePlatformStatistics,
@@ -42,8 +43,6 @@ export {
 export * from './use-authentication';
 export * from './use-blockchain-transaction';
 export * from './use-copy-to-clipboard';
-export * from './use-image-error';
-export * from './use-image-upload';
 export * from './use-media-query';
 export * from './use-meta-color';
 export * from './use-mobile';

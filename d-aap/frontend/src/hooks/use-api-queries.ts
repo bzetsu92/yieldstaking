@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 
 import {
     loginWithEmailPassword,
+    registerWithEmailPassword,
     getMetaMaskNonce,
     signInWithMetaMask,
     refreshToken as refreshTokenApi,
@@ -19,6 +20,7 @@ import { useAuthentication } from '@/hooks/use-authentication';
 import type {
     UpdateProfileData,
     LoginRequest,
+    RegisterRequest,
 } from '@/interfaces';
 
 export function useAuthProfile() {
@@ -44,6 +46,12 @@ export function useLogin() {
     });
 }
 
+export function useRegister() {
+    return useMutation({
+        mutationFn: (data: RegisterRequest) => registerWithEmailPassword(data),
+    });
+}
+
 export function useMetaMaskAuth() {
     const queryClient = useQueryClient();
 
@@ -59,7 +67,7 @@ export function useMetaMaskAuth() {
 
 export function useGetMetaMaskNonce() {
     return useMutation({
-        mutationFn: (walletAddress: string) => getMetaMaskNonce(walletAddress as `0x${string}`),
+        mutationFn: () => getMetaMaskNonce(),
     });
 }
 

@@ -13,6 +13,7 @@ import {
 import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from '@tabler/icons-react';
 import { ExternalLink, Search, TrendingUp } from 'lucide-react';
 
+import { formatTokenAmount } from '@/lib/utils/format';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,8 +61,8 @@ export function RewardHistoryTable({
     data, 
     explorerUrl = 'https://sepolia.etherscan.io',
     contractAddress,
-    stakeSymbol = 'USDT',
-    rewardSymbol = 'AUR',
+    stakeSymbol = 'AUR',
+    rewardSymbol = 'USDT',
 }: RewardHistoryTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -90,34 +91,50 @@ export function RewardHistoryTable({
         {
             accessorKey: 'stakedAmount',
             header: 'Staked',
-            cell: ({ row }) => (
-                <div className="font-medium">{row.original.stakedAmount} {stakeSymbol}</div>
-            ),
+            cell: ({ row }) => {
+                const amount = BigInt(row.original.stakedAmount || '0');
+                return (
+                    <div className="font-medium">
+                        {formatTokenAmount(amount, 18, 2)} AUR
+                    </div>
+                );
+            },
         },
         {
             accessorKey: 'totalRewards',
             header: 'Total Rewards',
-            cell: ({ row }) => (
-                <span className="text-green-600 dark:text-green-400 font-medium">
-                    +{row.original.totalRewards} {rewardSymbol}
-                </span>
-            ),
+            cell: ({ row }) => {
+                const amount = BigInt(row.original.totalRewards || '0');
+                return (
+                    <span className="text-green-600 dark:text-green-400 font-medium">
+                        +{formatTokenAmount(amount, 18, 4)} USDT
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'claimed',
             header: 'Claimed',
-            cell: ({ row }) => (
-                <span>{row.original.claimed} {rewardSymbol}</span>
-            ),
+            cell: ({ row }) => {
+                const amount = BigInt(row.original.claimed || '0');
+                return (
+                    <span>
+                        {formatTokenAmount(amount, 18, 4)} USDT
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'pending',
             header: 'Pending',
-            cell: ({ row }) => (
-                <span className="font-medium text-green-600 dark:text-green-400">
-                    +{row.original.pending} {rewardSymbol}
-                </span>
-            ),
+            cell: ({ row }) => {
+                const amount = BigInt(row.original.pending || '0');
+                return (
+                    <span className="font-medium text-green-600 dark:text-green-400">
+                        +{formatTokenAmount(amount, 18, 4)} USDT
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'status',

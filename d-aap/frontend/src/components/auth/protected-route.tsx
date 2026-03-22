@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -12,18 +11,10 @@ type ProtectedRouteProps = {
     requiredRole?: UserRole;
 };
 
-const TOKEN_KEYS = ['access_token', 'auth_session'] as const;
-
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
     const { isAuthenticated, isLoading } = useAuthentication();
     const { data: profile, isLoading: profileLoading } = useAuthProfile();
-
-    const hasLocalAuth = useMemo(() => {
-        if (typeof window === 'undefined') return false;
-        return TOKEN_KEYS.some((key) => !!localStorage.getItem(key));
-    }, []);
-
-    if (isLoading && !hasLocalAuth) {
+    if (isLoading) {
         return (
             <div className="flex h-screen items-center justify-center">
                 <div className="text-muted-foreground">Loading...</div>
@@ -31,15 +22,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         );
     }
 
-    if (!isAuthenticated && hasLocalAuth && isLoading) {
-        return (
-            <div className="flex h-screen items-center justify-center">
-                <div className="text-muted-foreground">Authenticating...</div>
-            </div>
-        );
-    }
-
-    if (!isAuthenticated && !hasLocalAuth) {
+    if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
     }
 

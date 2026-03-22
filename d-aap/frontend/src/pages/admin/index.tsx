@@ -64,8 +64,8 @@ export default function AdminDashboard() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold">${formatAmount(stats?.staking.totalLocked ?? '0')}</div>
-                        <p className="text-xs text-muted-foreground mt-1">USDT staked in contracts</p>
+                        <div className="text-3xl font-bold">{formatAmount(stats?.staking.totalLocked ?? '0', 18)}</div>
+                        <p className="text-xs text-muted-foreground mt-1">AUR staked in contracts</p>
                     </CardContent>
                 </Card>
 
@@ -78,8 +78,8 @@ export default function AdminDashboard() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold">{formatCompact(Number(formatAmount(stats?.staking.totalRewardDebt ?? '0', 18)))}</div>
-                        <p className="text-xs text-muted-foreground mt-1">AUR distributed as rewards</p>
+                        <div className="text-3xl font-bold">{formatCompact(Number(formatAmount(stats?.staking.totalRewardDebt ?? '0', 6)))}</div>
+                        <p className="text-xs text-muted-foreground mt-1">USDT distributed as rewards</p>
                     </CardContent>
                 </Card>
 

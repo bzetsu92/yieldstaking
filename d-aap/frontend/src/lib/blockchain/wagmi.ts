@@ -1,13 +1,15 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
-import { http, createStorage, cookieStorage } from 'wagmi';
+import { http, createStorage, cookieStorage, fallback } from 'wagmi';
 
 import { CHAIN_IDS } from '../config/chains';
-import { RPC_ENDPOINTS, EXPLORER_ENDPOINTS } from '../constants/rpc';
+import { RPC_ENDPOINTS, EXPLORER_ENDPOINTS, RPC_FALLBACK_ENDPOINTS } from '../constants/rpc';
 
 import type { Chain } from '@rainbow-me/rainbowkit';
 
-const projectId =
-    import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID || 'fe1a8424a43c2a990f595862bd4bc5b8';
+const projectId = import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID;
+if (!projectId) {
+    throw new Error('Missing VITE_WALLET_CONNECT_PROJECT_ID');
+}
 
 const sepoliaChain = {
     id: CHAIN_IDS.SEPOLIA,
@@ -29,6 +31,7 @@ const sepoliaChain = {
     },
 } as const satisfies Chain;
 
+/* 
 const bscMainnet = {
     id: CHAIN_IDS.BSC_MAINNET,
     name: 'Binance Smart Chain',
@@ -148,16 +151,10 @@ const optimism = {
         },
     },
 } as const satisfies Chain;
+*/
 
-const SUPPORTED_CHAINS = [
-    sepoliaChain,
-    ethereum,
-    bscMainnet,
-    bscTestnetChain,
-    polygon,
-    arbitrum,
-    optimism,
-] as const satisfies readonly Chain[];
+// Contracts are currently deployed only on Sepolia in this repo.
+const SUPPORTED_CHAINS = [sepoliaChain] as const satisfies readonly Chain[];
 
 export const config = getDefaultConfig({
     appName: 'NFT Events Platform',
@@ -168,11 +165,21 @@ export const config = getDefaultConfig({
         storage: cookieStorage,
     }),
     transports: SUPPORTED_CHAINS.reduce(
-        (obj, chain) => ({
-            ...obj,
-            [chain.id]: http(chain.rpcUrls.default.http[0]),
-        }),
-        {} as Record<number, ReturnType<typeof http>>,
+        (obj, chain) => {
+            const fallbacks = RPC_FALLBACK_ENDPOINTS[chain.id] || [];
+            const endpoints = [
+                RPC_ENDPOINTS[chain.id],
+                ...fallbacks,
+            ].filter(Boolean);
+
+            return {
+                ...obj,
+                [chain.id]: fallback(
+                    endpoints.map((url) => http(url))
+                ),
+            };
+        },
+        {} as Record<number, any>,
     ),
 });
 

@@ -7,7 +7,9 @@ const getRpcEndpoint = (chainId: number, defaultUrl: string): string => {
     }
 
     if (import.meta.env.PROD) {
-        throw new Error(`Missing required RPC endpoint env var: ${envKey}`);
+        console.warn(
+            `[RPC] Missing env var ${envKey}, using public RPC. For production, set ${envKey} for better reliability.`,
+        );
     }
 
     return defaultUrl;

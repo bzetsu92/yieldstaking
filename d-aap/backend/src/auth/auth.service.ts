@@ -14,7 +14,6 @@ import { compare, hash } from "bcrypt";
 import { UserService } from "../modules/user/user.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
-import { AuthenticatedRequest } from "./interface/authenticated-request.interface";
 import { UserPrincipal } from "./interface/user-principal.interface";
 import { ERR_MESSAGES, SUCCESS_MESSAGES } from "../constants/messages.constant";
 
@@ -88,13 +87,14 @@ export class AuthService {
     }
 
     async login(
-        req: AuthenticatedRequest,
-    ): Promise<{ access_token: string; refresh_token: string }> {
+        user: UserPrincipal,
+    ): Promise<{ access_token: string; refresh_token: string; user: UserPrincipal }> {
         const payload = {
-            id: req.user.id,
-            email: req.user.email,
-            name: req.user.name,
-            role: req.user.role,
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            walletAddress: user.walletAddress,
         };
 
         const accessToken = this.jwtService.sign(payload, {
@@ -108,6 +108,7 @@ export class AuthService {
         return {
             access_token: accessToken,
             refresh_token: refreshToken,
+            user,
         };
     }
 

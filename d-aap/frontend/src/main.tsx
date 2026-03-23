@@ -6,6 +6,10 @@ import './styles/index.css';
 import '@rainbow-me/rainbowkit/styles.css';
 import { ErrorBoundary } from './components/common/error-boundary.jsx';
 
+if (typeof window !== 'undefined') {
+    window.sessionStorage.removeItem('chunk-load-failed-reloaded');
+}
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
     throw new Error('Root element not found');

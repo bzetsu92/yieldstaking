@@ -3,12 +3,16 @@ import { UserRole, UserStatus, TransactionType } from "@prisma/client";
 
 import { ERR_MESSAGES } from "../../constants/messages.constant";
 import { PrismaService } from "../../prisma/prisma.service";
+import { BlockchainService } from "../blockchain/blockchain.service";
 
 @Injectable()
 export class AdminService {
     private readonly logger = new Logger(AdminService.name);
 
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        private blockchain: BlockchainService,
+    ) {}
 
     async getPlatformStatistics() {
         const [
@@ -70,11 +74,11 @@ export class AdminService {
     }
 
     async getContracts(chainId?: number) {
-        return this.prisma.stakingContract.findMany({
+        const contracts = await this.prisma.stakingContract.findMany({
             where: chainId ? { chainId } : undefined,
             include: {
                 chain: {
-                    select: { name: true, slug: true },
+                    select: { id: true, name: true, slug: true, explorerUrl: true },
                 },
                 packages: {
                     select: {
@@ -86,6 +90,7 @@ export class AdminService {
                         totalStaked: true,
                         stakersCount: true,
                     },
+                    orderBy: { packageId: "asc" },
                 },
                 _count: {
                     select: { stakePositions: true },
@@ -93,6 +98,16 @@ export class AdminService {
             },
             orderBy: { createdAt: "desc" },
         });
+
+        return contracts.map((contract: any) => ({
+            ...contract,
+            minStakeAmount: contract.minStakeAmount?.toString() || "0",
+            maxStakePerUser: contract.maxStakePerUser?.toString() || "0",
+            explorerUrl:
+                contract.address && contract.chain.explorerUrl
+                    ? `${contract.chain.explorerUrl}/address/${contract.address}`
+                    : null,
+        }));
     }
 
     async getPackages(contractId?: number) {
@@ -384,6 +399,26 @@ export class AdminService {
             limit,
             totalPages: Math.ceil(total / limit),
         };
+    }
+
+    async getBlockchainHealth() {
+        return this.blockchain.getHealthStatus();
+    }
+
+    async getBlockchainSyncStatuses() {
+        return this.blockchain.getAllSyncStatuses();
+    }
+
+    async getUnprocessedEventCount() {
+        return this.blockchain.getUnprocessedEventCount();
+    }
+
+    async triggerBlockchainSync(chainId: number, contractAddress: string) {
+        return this.blockchain.syncContract(chainId, contractAddress);
+    }
+
+    async processBlockchainEvents(limit: number) {
+        return this.blockchain.processUnprocessedEvents(limit);
     }
 
     async updateUserRole(userId: number, role: UserRole) {

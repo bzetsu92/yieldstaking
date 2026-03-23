@@ -1,9 +1,9 @@
-import { lazy } from 'react';
 import { type RouteObject } from 'react-router-dom';
 
 import ProtectedRoute from '@/components/auth/protected-route';
 import AppLayout from '@/components/layout/app-layout';
 import { RoleBasedRedirect } from '@/components/auth/role-based-redirect';
+import { lazyWithRetry as lazy } from '@/lib/utils/lazy-with-retry';
 
 // Public pages
 const HomePage = lazy(() => import('@/pages/home'));
@@ -20,13 +20,15 @@ const StakePage = lazy(() => import('@/pages/aureus/stake'));
 const WithdrawalsPage = lazy(() => import('@/pages/aureus/withdrawals'));
 const RewardHistoryPage = lazy(() => import('@/pages/aureus/reward-history'));
 
-// Admin pages
-const AdminDashboardPage = lazy(() => import('@/pages/admin/index'));
-const AdminUsersPage = lazy(() => import('@/pages/admin/users'));
-const AdminContractsPage = lazy(() => import('@/pages/admin/contracts'));
-const AdminPositionsPage = lazy(() => import('@/pages/admin/positions'));
-const AdminTransactionsPage = lazy(() => import('@/pages/admin/transactions'));
-const AdminBlockchainPage = lazy(() => import('@/pages/admin/blockchain'));
+// Management pages
+const ManagementDashboardPage = lazy(() => import('@/pages/management/index'));
+const ManagementUsersPage = lazy(() => import('@/pages/management/users'));
+const ManagementPositionsPage = lazy(() => import('@/pages/management/positions'));
+
+// Network pages
+const NetworkDashboardPage = lazy(() => import('@/pages/network/index'));
+const NetworkContractsPage = lazy(() => import('@/pages/network/setup'));
+const NetworkBlockchainPage = lazy(() => import('@/pages/network/monitor'));
 
 // Error pages
 const NotFoundPage = lazy(() => import('@/pages/not-found'));
@@ -40,12 +42,10 @@ const AdminPage = ({ children }: { children: React.ReactNode }) => (
 );
 
 export const routes: RouteObject[] = [
-    // Public home page (no layout)
     {
         path: '/',
         element: <HomePage />,
     },
-    // Auth pages
     {
         path: '/login',
         element: <LoginPage />,
@@ -106,54 +106,65 @@ export const routes: RouteObject[] = [
                     </ProtectedPage>
                 ),
             },
-            // Admin routes
+            // Management routes
             {
-                path: 'admin',
-                element: (
-                    <AdminPage>
-                        <AdminDashboardPage />
-                    </AdminPage>
-                ),
+                path: 'management',
+                children: [
+                    {
+                        index: true,
+                        element: (
+                            <AdminPage>
+                                <ManagementDashboardPage />
+                            </AdminPage>
+                        ),
+                    },
+                    {
+                        path: 'users',
+                        element: (
+                            <AdminPage>
+                                <ManagementUsersPage />
+                            </AdminPage>
+                        ),
+                    },
+                    {
+                        path: 'positions',
+                        element: (
+                            <AdminPage>
+                                <ManagementPositionsPage />
+                            </AdminPage>
+                        ),
+                    },
+                ],
             },
+            // Network routes
             {
-                path: 'admin/users',
-                element: (
-                    <AdminPage>
-                        <AdminUsersPage />
-                    </AdminPage>
-                ),
-            },
-            {
-                path: 'admin/contracts',
-                element: (
-                    <AdminPage>
-                        <AdminContractsPage />
-                    </AdminPage>
-                ),
-            },
-            {
-                path: 'admin/positions',
-                element: (
-                    <AdminPage>
-                        <AdminPositionsPage />
-                    </AdminPage>
-                ),
-            },
-            {
-                path: 'admin/transactions',
-                element: (
-                    <AdminPage>
-                        <AdminTransactionsPage />
-                    </AdminPage>
-                ),
-            },
-            {
-                path: 'admin/blockchain',
-                element: (
-                    <AdminPage>
-                        <AdminBlockchainPage />
-                    </AdminPage>
-                ),
+                path: 'network',
+                children: [
+                    {
+                        index: true,
+                        element: (
+                            <AdminPage>
+                                <NetworkDashboardPage />
+                            </AdminPage>
+                        ),
+                    },
+                    {
+                        path: 'setup',
+                        element: (
+                            <AdminPage>
+                                <NetworkContractsPage />
+                            </AdminPage>
+                        ),
+                    },
+                    {
+                        path: 'monitor',
+                        element: (
+                            <AdminPage>
+                                <NetworkBlockchainPage />
+                            </AdminPage>
+                        ),
+                    },
+                ],
             },
             {
                 path: '*',

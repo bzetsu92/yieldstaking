@@ -1,5 +1,5 @@
 import { ChevronRight, type LucideIcon } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -32,6 +32,43 @@ export function NavMain({
     const navigate = useNavigate();
     const pathname = location.pathname;
 
+    // Local state for which items are open.
+    // Initialize only the items that match the current pathname.
+    const [openItems, setOpenItems] = useState<Record<string, boolean>>(() => {
+        const initialOpen: Record<string, boolean> = {};
+        items.forEach((item) => {
+            const sectionActive =
+                item.isActive ||
+                pathname === item.url ||
+                (item.items?.some((s) => pathname === s.url || pathname.startsWith(`${s.url}/`)) ?? false);
+            if (sectionActive) {
+                initialOpen[item.title] = true;
+            }
+        });
+        return initialOpen;
+    });
+
+    // When the user navigates, if they go to a new section, open it.
+    useEffect(() => {
+        setOpenItems((prev) => {
+            const nextOpen = { ...prev };
+            let changed = false;
+            items.forEach((item) => {
+                const sectionActive =
+                    item.isActive ||
+                    pathname === item.url ||
+                    (item.items?.some((s) => pathname === s.url || pathname.startsWith(`${s.url}/`)) ?? false);
+                
+                // If the section is active but not open, open it.
+                if (sectionActive && !prev[item.title]) {
+                    nextOpen[item.title] = true;
+                    changed = true;
+                }
+            });
+            return changed ? nextOpen : prev;
+        });
+    }, [pathname, items]);
+
     const handleNavigate = useCallback(
         (url: string) => {
             navigate(url);
@@ -39,23 +76,32 @@ export function NavMain({
         [navigate],
     );
 
+    const toggleItem = (title: string) => {
+        setOpenItems((prev) => ({
+            ...prev,
+            [title]: !prev[title],
+        }));
+    };
+
     return (
         <SidebarGroup>
-            <SidebarGroupLabel>Platform</SidebarGroupLabel>
+            <SidebarGroupLabel>Platform Management</SidebarGroupLabel>
             <SidebarMenu>
                 {items.map((item) => {
                     const sectionActive =
                         item.isActive ||
                         pathname === item.url ||
-                        (item.items?.some((s) => pathname.startsWith(s.url)) ?? false);
+                        (item.items?.some((s) => pathname === s.url || pathname.startsWith(`${s.url}/`)) ?? false);
                     const hasSubItems = item.items && item.items.length > 0;
+                    const isOpen = !!openItems[item.title];
 
                     if (hasSubItems) {
                         return (
                             <Collapsible
                                 key={item.title}
                                 asChild
-                                defaultOpen={sectionActive}
+                                open={isOpen}
+                                onOpenChange={() => toggleItem(item.title)}
                                 className="group/collapsible"
                             >
                                 <SidebarMenuItem>
@@ -65,8 +111,8 @@ export function NavMain({
                                             isActive={sectionActive}
                                         >
                                             {item.icon && <item.icon />}
-                                            <span>{item.title}</span>
-                                            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                                            <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                                            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[collapsible=icon]:hidden" />
                                         </SidebarMenuButton>
                                     </CollapsibleTrigger>
                                     <CollapsibleContent>
@@ -103,7 +149,7 @@ export function NavMain({
                                 onClick={() => handleNavigate(item.url)}
                             >
                                 {item.icon && <item.icon />}
-                                <span>{item.title}</span>
+                                <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                             </SidebarMenuButton>
                         </SidebarMenuItem>
                     );

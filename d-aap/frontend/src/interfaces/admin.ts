@@ -36,6 +36,8 @@ export interface StakingContractAdmin {
     rewardTokenSymbol: string;
     stakeTokenDecimals: number;
     rewardTokenDecimals: number;
+    minStakeAmount: string;
+    maxStakePerUser: string;
     totalLocked: string;
     totalRewardDebt: string;
     isPaused: boolean;

@@ -17,16 +17,17 @@ import { usePlatformStatistics } from '@/hooks/use-admin';
 
 function formatAmount(amount: string, decimals: number = 6): string {
     const value = Number(BigInt(amount)) / Math.pow(10, decimals);
-    return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+    return new Intl.NumberFormat('en-US', { maximumFractionDigits: decimals > 6 ? 2 : 4 }).format(value);
 }
 
-function formatCompact(value: number): string {
-    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
-    return value.toString();
+function formatCompact(num: number): string {
+    return new Intl.NumberFormat('en-US', {
+        notation: 'compact',
+        maximumFractionDigits: 1,
+    }).format(num);
 }
 
-export default function AdminDashboard() {
+export default function AdminDashboardPage() {
     const { data: stats, isLoading } = usePlatformStatistics();
 
     if (isLoading) {
@@ -46,11 +47,11 @@ export default function AdminDashboard() {
     const walletPercentage = totalUsers > 0 ? (usersWithWallets / totalUsers) * 100 : 0;
 
     return (
-        <div className="flex flex-1 flex-col py-6 px-4 lg:px-6 space-y-8">
+        <div className="flex flex-1 flex-col py-6 px-4 lg:px-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">Dashboard</h1>
-                    <p className="text-muted-foreground">Welcome back! Here's your platform overview.</p>
+                    <p className="text-muted-foreground">Global statistics and system health</p>
                 </div>
             </div>
 
@@ -182,7 +183,37 @@ export default function AdminDashboard() {
             <div>
                 <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                    <Link to="/admin/users">
+                    <Link to="/app/network/setup">
+                        <Card className="group hover:border-primary/50 hover:shadow-md transition-all cursor-pointer">
+                            <CardContent className="flex items-center gap-4 p-4">
+                                <div className="p-3 rounded-xl bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
+                                    <BarChart3 className="h-5 w-5 text-orange-500" />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="font-medium">Contracts</div>
+                                    <div className="text-sm text-muted-foreground">Setup staking</div>
+                                </div>
+                                <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </CardContent>
+                        </Card>
+                    </Link>
+
+                    <Link to="/app/network/monitor">
+                        <Card className="group hover:border-primary/50 hover:shadow-md transition-all cursor-pointer">
+                            <CardContent className="flex items-center gap-4 p-4">
+                                <div className="p-3 rounded-xl bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
+                                    <Settings className="h-5 w-5 text-blue-500" />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="font-medium">Blockchain</div>
+                                    <div className="text-sm text-muted-foreground">Sync & events</div>
+                                </div>
+                                <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </CardContent>
+                        </Card>
+                    </Link>
+
+                    <Link to="/app/management/users">
                         <Card className="group hover:border-primary/50 hover:shadow-md transition-all cursor-pointer">
                             <CardContent className="flex items-center gap-4 p-4">
                                 <div className="p-3 rounded-xl bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
@@ -197,7 +228,7 @@ export default function AdminDashboard() {
                         </Card>
                     </Link>
 
-                    <Link to="/admin/positions">
+                    <Link to="/app/management/positions">
                         <Card className="group hover:border-primary/50 hover:shadow-md transition-all cursor-pointer">
                             <CardContent className="flex items-center gap-4 p-4">
                                 <div className="p-3 rounded-xl bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
@@ -206,36 +237,6 @@ export default function AdminDashboard() {
                                 <div className="flex-1">
                                     <div className="font-medium">Positions</div>
                                     <div className="text-sm text-muted-foreground">View all stakes</div>
-                                </div>
-                                <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                            </CardContent>
-                        </Card>
-                    </Link>
-
-                    <Link to="/admin/transactions">
-                        <Card className="group hover:border-primary/50 hover:shadow-md transition-all cursor-pointer">
-                            <CardContent className="flex items-center gap-4 p-4">
-                                <div className="p-3 rounded-xl bg-orange-500/10 group-hover:bg-orange-500/20 transition-colors">
-                                    <BarChart3 className="h-5 w-5 text-orange-500" />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="font-medium">Transactions</div>
-                                    <div className="text-sm text-muted-foreground">View history</div>
-                                </div>
-                                <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                            </CardContent>
-                        </Card>
-                    </Link>
-
-                    <Link to="/admin/blockchain">
-                        <Card className="group hover:border-primary/50 hover:shadow-md transition-all cursor-pointer">
-                            <CardContent className="flex items-center gap-4 p-4">
-                                <div className="p-3 rounded-xl bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
-                                    <Settings className="h-5 w-5 text-blue-500" />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="font-medium">Blockchain</div>
-                                    <div className="text-sm text-muted-foreground">Sync & events</div>
                                 </div>
                                 <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                             </CardContent>

@@ -120,6 +120,27 @@ export const yieldStakingAbi = [
     },
     {
         type: "function",
+        name: "setMinStakeAmount",
+        inputs: [{ name: "newAmount", type: "uint256" }],
+        outputs: [],
+        stateMutability: "nonpayable",
+    },
+    {
+        type: "function",
+        name: "setMaxStakePerUser",
+        inputs: [{ name: "newMax", type: "uint256" }],
+        outputs: [],
+        stateMutability: "nonpayable",
+    },
+    {
+        type: "function",
+        name: "setMaxTotalStakedPerPackage",
+        inputs: [{ name: "newMax", type: "uint256" }],
+        outputs: [],
+        stateMutability: "nonpayable",
+    },
+    {
+        type: "function",
         name: "stakeToken",
         inputs: [],
         outputs: [{ name: "", type: "address" }],

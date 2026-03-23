@@ -113,7 +113,7 @@ export default function AdminUsersPage() {
             header: 'Positions',
             cell: ({ row }) => (
                 <Link 
-                    to={`/admin/positions?userId=${row.original.id}`}
+                    to={`/app/management/positions?userId=${row.original.id}`}
                     className="flex items-center gap-1 text-primary hover:underline text-sm"
                 >
                     <TrendingUp className="w-3 h-3" />

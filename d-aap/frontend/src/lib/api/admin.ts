@@ -59,18 +59,16 @@ export const fetchAdminTransactions = (params?: {
 }) => api.get<AdminTransactionsResponse>('/v1/admin/transactions', { params });
 
 export const fetchBlockchainSyncStatuses = () =>
-    api.get<BlockchainSyncStatus[]>('/v1/blockchain/sync');
+    api.get<BlockchainSyncStatus[]>('/v1/admin/blockchain/sync-status');
 
 export const fetchBlockchainHealth = () =>
-    api.get<BlockchainHealth>('/v1/blockchain/health');
+    api.get<BlockchainHealth>('/v1/admin/blockchain/health');
 
 export const triggerBlockchainSync = (chainId: number, contractAddress: string) =>
-    api.post('/v1/blockchain/sync', { chainId, contractAddress });
+    api.post('/v1/admin/blockchain/sync', { chainId, contractAddress });
 
 export const processBlockchainEvents = (limit?: number) =>
-    api.post('/v1/blockchain/process-events', null, { 
-        params: limit ? { limit } : undefined 
-    });
+    api.post('/v1/admin/blockchain/process-events', { limit });
 
 export const fetchUnprocessedEventCount = () =>
-    api.get<{ count: number }>('/v1/blockchain/events/unprocessed/count');
+    api.get<{ count: number }>('/v1/admin/blockchain/unprocessed-count');

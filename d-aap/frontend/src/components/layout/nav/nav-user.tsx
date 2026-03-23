@@ -12,7 +12,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { SidebarMenu, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { useAuthentication } from '@/hooks/use-authentication';
 import { useUserInfo } from '@/hooks/use-user-info';
 import { hasAccountAuth } from '@/lib/auth';
@@ -22,9 +22,6 @@ import { ChangePasswordModal } from '../../profile/change-password-modal';
 import { MENU_ITEMS } from '../../profile/profile-constants';
 import { UserAvatar } from '../../profile/user-avatar';
 
-const TRIGGER_BUTTON_CLASSES =
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer border border-muted-foreground/40';
-
 const iconMap = {
     User,
     Lock,
@@ -32,7 +29,7 @@ const iconMap = {
 } as const;
 
 export function NavUser() {
-    const { isMobile } = useSidebar();
+    const { isMobile, state } = useSidebar();
     const navigate = useNavigate();
     const { disconnect } = useDisconnect();
     const { signOut } = useAuthentication();
@@ -86,19 +83,22 @@ export function NavUser() {
                 <SidebarMenuItem>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button type="button" className={TRIGGER_BUTTON_CLASSES}>
+                            <SidebarMenuButton
+                                size="lg"
+                                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground border border-muted-foreground/40"
+                            >
                                 <UserAvatar
                                     avatar={userInfo.avatar}
                                     name={userInfo.name}
                                     size="sm"
                                 />
-                                <div className="grid flex-1 text-left text-sm leading-tight">
+                                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                                     <span className="truncate font-semibold">{userInfo.name}</span>
                                     <span className="truncate text-xs text-muted-foreground">
                                         {displaySubtext}
                                     </span>
                                 </div>
-                            </button>
+                            </SidebarMenuButton>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                             className="w-[--radix-dropdown-menu-trigger-width] min-w-64 rounded-lg"

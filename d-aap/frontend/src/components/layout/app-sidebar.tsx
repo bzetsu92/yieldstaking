@@ -1,4 +1,4 @@
-import { GalleryVerticalEnd, Home, Sparkles, Shield } from 'lucide-react';
+import { GalleryVerticalEnd, Sparkles, Shield, Cpu } from 'lucide-react';
 import * as React from 'react';
 
 import { TeamSwitcher } from '@/components/common';
@@ -45,33 +45,36 @@ const userNavItems = [
 
 const adminNavItems = [
     {
-        title: 'Admin',
-        url: '/app/admin',
+        title: 'Platform Management',
+        url: '/app/management',
         icon: Shield,
         items: [
             {
                 title: 'Dashboard',
-                url: '/app/admin',
+                url: '/app/management',
             },
             {
                 title: 'Users',
-                url: '/app/admin/users',
-            },
-            {
-                title: 'Contracts',
-                url: '/app/admin/contracts',
+                url: '/app/management/users',
             },
             {
                 title: 'Positions',
-                url: '/app/admin/positions',
+                url: '/app/management/positions',
+            },
+        ],
+    },
+    {
+        title: 'Network Config',
+        url: '/app/network',
+        icon: Cpu,
+        items: [
+            {
+                title: 'Monitor',
+                url: '/app/network/monitor',
             },
             {
-                title: 'Transactions',
-                url: '/app/admin/transactions',
-            },
-            {
-                title: 'Blockchain',
-                url: '/app/admin/blockchain',
+                title: 'Setup',
+                url: '/app/network/setup',
             },
         ],
     },

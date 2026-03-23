@@ -2,6 +2,7 @@ import {
     Controller,
     Get,
     Put,
+    Post,
     Body,
     Param,
     Query,
@@ -137,6 +138,41 @@ export class AdminController {
         @Query("limit") limit?: number,
     ) {
         return this.adminService.getUsers(page || 1, limit || 20);
+    }
+
+    @Get("blockchain/health")
+    @ApiOperation({ summary: "Get blockchain service health" })
+    async getBlockchainHealth() {
+        return this.adminService.getBlockchainHealth();
+    }
+
+    @Get("blockchain/sync-status")
+    @ApiOperation({ summary: "Get all blockchain sync statuses" })
+    async getBlockchainSyncStatuses() {
+        return this.adminService.getBlockchainSyncStatuses();
+    }
+
+    @Get("blockchain/unprocessed-count")
+    @ApiOperation({ summary: "Get count of unprocessed blockchain events" })
+    async getUnprocessedEventCount() {
+        return this.adminService.getUnprocessedEventCount();
+    }
+
+    @Post("blockchain/sync")
+    @ApiOperation({ summary: "Trigger manual blockchain sync for a contract" })
+    async triggerBlockchainSync(
+        @Body() body: { chainId: number; contractAddress: string },
+    ) {
+        return this.adminService.triggerBlockchainSync(
+            body.chainId,
+            body.contractAddress,
+        );
+    }
+
+    @Post("blockchain/process-events")
+    @ApiOperation({ summary: "Process pending blockchain events" })
+    async processBlockchainEvents(@Body("limit") limit?: number) {
+        return this.adminService.processBlockchainEvents(limit || 100);
     }
 
     @Put("users/:id/role")

@@ -40,6 +40,7 @@ export {
     useProcessBlockchainEvents,
 } from './use-admin';
 
+export { useAdminBlockchainActions } from './use-admin-blockchain';
 export * from './use-authentication';
 export * from './use-blockchain-transaction';
 export * from './use-copy-to-clipboard';

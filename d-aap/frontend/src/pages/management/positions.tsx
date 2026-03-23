@@ -8,10 +8,11 @@ import {
     useReactTable,
 } from '@tanstack/react-table';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
-import { Check, X, TrendingUp, Search, FileText } from 'lucide-react';
+import { Check, X, TrendingUp, Search, ExternalLink, History, Coins, ArrowUpRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -21,6 +22,13 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
+import {
     Table,
     TableBody,
     TableCell,
@@ -28,13 +36,119 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { useAdminPositions } from '@/hooks/use-admin';
+import { useAdminPositions, useAdminTransactions } from '@/hooks/use-admin';
 
 import type { StakePositionAdmin } from '@/interfaces/admin';
 
 function formatAmount(amount: string, decimals: number = 6): string {
     const value = Number(BigInt(amount)) / Math.pow(10, decimals);
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
+}
+
+function PositionDetails({ positionId, open, onOpenChange }: { positionId: number | null, open: boolean, onOpenChange: (open: boolean) => void }) {
+    const { data: txData, isLoading } = useAdminTransactions({ 
+        positionId: positionId ?? undefined,
+        limit: 50 
+    });
+
+    const claims = txData?.transactions.filter(tx => tx.type === 'CLAIM') ?? [];
+    const withdrawal = txData?.transactions.find(tx => tx.type === 'WITHDRAWAL');
+
+    return (
+        <Sheet open={open} onOpenChange={onOpenChange}>
+            <SheetContent className="sm:max-w-xl overflow-y-auto">
+                <SheetHeader className="pb-6">
+                    <SheetTitle className="flex items-center gap-2">
+                        <History className="w-5 h-5 text-primary" />
+                        Position History #{positionId}
+                    </SheetTitle>
+                    <SheetDescription>
+                        View all claim and withdrawal events for this staking position.
+                    </SheetDescription>
+                </SheetHeader>
+
+                {isLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                    </div>
+                ) : (
+                    <div className="space-y-8">
+                        <div className="space-y-3">
+                            <h4 className="text-sm font-semibold flex items-center gap-2">
+                                <ArrowUpRight className="w-4 h-4 text-orange-500" />
+                                Principal Withdrawal
+                            </h4>
+                            {withdrawal ? (
+                                <Card className="bg-orange-500/5 border-orange-500/20">
+                                    <CardContent className="p-4 flex items-center justify-between">
+                                        <div>
+                                            <div className="text-sm font-medium">Withdrawn</div>
+                                            <div className="text-xs text-muted-foreground">{new Date(withdrawal.createdAt).toLocaleString()}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-mono font-bold text-orange-600">
+                                                {formatAmount(withdrawal.amount, 18)} AUR
+                                            </div>
+                                            <a 
+                                                href={`https://sepolia.etherscan.io/tx/${withdrawal.txHash}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-[10px] text-primary hover:underline flex items-center justify-end gap-1"
+                                            >
+                                                View Tx <ExternalLink className="w-2 h-2" />
+                                            </a>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-4 text-center border border-dashed">
+                                    Principal is still locked or not yet withdrawn
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-semibold flex items-center gap-2">
+                                    <Coins className="w-4 h-4 text-green-500" />
+                                    Reward Claims ({claims.length})
+                                </h4>
+                            </div>
+                            {claims.length > 0 ? (
+                                <div className="space-y-2">
+                                    {claims.map((tx) => (
+                                        <div key={tx.id} className="flex items-center justify-between p-3 rounded-lg border bg-card text-sm">
+                                            <div>
+                                                <div className="font-medium text-green-600">Claimed Rewards</div>
+                                                <div className="text-xs text-muted-foreground">{new Date(tx.createdAt).toLocaleString()}</div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-mono font-bold">
+                                                    {formatAmount(tx.amount, 6)} USDT
+                                                </div>
+                                                <a 
+                                                    href={`https://sepolia.etherscan.io/tx/${tx.txHash}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[10px] text-primary hover:underline flex items-center justify-end gap-1"
+                                                >
+                                                    View Tx <ExternalLink className="w-2 h-2" />
+                                                </a>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-4 text-center border border-dashed">
+                                    No rewards have been claimed yet
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </SheetContent>
+        </Sheet>
+    );
 }
 
 export default function AdminPositionsPage() {
@@ -44,6 +158,8 @@ export default function AdminPositionsPage() {
     const [statusFilter, setStatusFilter] = React.useState<string>('all');
     const [searchQuery, setSearchQuery] = React.useState('');
     const [debouncedSearch, setDebouncedSearch] = React.useState('');
+    const [selectedPositionId, setSelectedPositionId] = React.useState<number | null>(null);
+    const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
 
     React.useEffect(() => {
         const timer = setTimeout(() => {
@@ -109,7 +225,7 @@ export default function AdminPositionsPage() {
             header: 'Principal',
             cell: ({ row }) => (
                 <span className="font-mono">
-                    {formatAmount(row.original.principal, 6)} {row.original.contract.stakeTokenSymbol}
+                    {formatAmount(row.original.principal, 18)} {row.original.contract.stakeTokenSymbol}
                 </span>
             ),
         },
@@ -166,16 +282,21 @@ export default function AdminPositionsPage() {
             },
         },
         {
-            id: 'transactions',
+            id: 'actions',
             header: '',
             cell: ({ row }) => (
-                <Link 
-                    to={`/admin/transactions?positionId=${row.original.id}`}
-                    className="flex items-center gap-1 text-primary hover:underline text-sm"
+                <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="h-8 gap-1"
+                    onClick={() => {
+                        setSelectedPositionId(row.original.id);
+                        setIsDetailsOpen(true);
+                    }}
                 >
-                    <FileText className="w-3 h-3" />
+                    <History className="w-3.5 h-3.5" />
                     History
-                </Link>
+                </Button>
             ),
         },
     ], []);
@@ -187,7 +308,7 @@ export default function AdminPositionsPage() {
         getPaginationRowModel: getPaginationRowModel(),
         initialState: {
             pagination: {
-                pageSize: 10,
+                pageSize: 8,
             },
         },
     });
@@ -325,6 +446,12 @@ export default function AdminPositionsPage() {
                     </div>
                 )}
             </div>
+
+            <PositionDetails 
+                positionId={selectedPositionId}
+                open={isDetailsOpen}
+                onOpenChange={setIsDetailsOpen}
+            />
         </div>
     );
 }

@@ -7,7 +7,8 @@ import {
     useReactTable,
 } from '@tanstack/react-table';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
-import { RefreshCw, Play, AlertCircle, CheckCircle, Clock, Database, Activity, Inbox, Zap } from 'lucide-react';
+import { RefreshCw, Play, AlertCircle, CheckCircle, Clock, Database, Activity, Inbox, Zap, Wallet, ShieldAlert, Coins } from 'lucide-react';
+import { parseUnits } from 'viem';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,21 +22,53 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
     useBlockchainSyncStatuses,
     useBlockchainHealth,
     useUnprocessedEventCount,
     useTriggerBlockchainSync,
     useProcessBlockchainEvents,
-} from '@/hooks/use-admin';
+    useAdminBlockchainActions,
+    useAdminContracts
+} from '@/hooks';
+import { toast } from 'sonner';
+import { AdminWalletGuard } from '@/components/auth/admin-wallet-guard';
 
 import type { BlockchainSyncStatus } from '@/interfaces/admin';
 
-export default function AdminBlockchainPage() {
+export default function NetworkMonitorPage() {
     const { data: syncStatuses, isLoading: syncLoading, refetch: refetchSync } = useBlockchainSyncStatuses();
     const { data: health, isLoading: healthLoading } = useBlockchainHealth();
     const { data: unprocessed } = useUnprocessedEventCount();
+    const { data: contracts } = useAdminContracts();
     const triggerSync = useTriggerBlockchainSync();
     const processEvents = useProcessBlockchainEvents();
+    const { withdrawExcessReward, isWritePending } = useAdminBlockchainActions();
+
+    const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = React.useState(false);
+    const [withdrawAmount, setWithdrawAmount] = React.useState('100');
+    const [selectedContract, setSelectedContract] = React.useState<any>(null);
+
+    const onWithdrawSubmit = async () => {
+        if (!selectedContract) return;
+        try {
+            const amount = parseUnits(withdrawAmount, selectedContract.rewardTokenDecimals);
+            await withdrawExcessReward(amount);
+            setIsWithdrawDialogOpen(false);
+            toast.success('Withdraw transaction sent');
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to withdraw excess rewards');
+        }
+    };
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -140,19 +173,21 @@ export default function AdminBlockchainPage() {
         <div className="flex flex-1 flex-col py-6 px-4 lg:px-6 space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold">Blockchain Management</h1>
+                    <h1 className="text-2xl font-bold">Monitor</h1>
                     <p className="text-muted-foreground">Monitor sync status and process events</p>
                 </div>
-                <Button 
-                    variant="outline" 
-                    onClick={() => refetchSync()}
-                >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Refresh
-                </Button>
+                <div className="flex items-center gap-3">
+                    <Button 
+                        variant="outline" 
+                        onClick={() => refetchSync()}
+                    >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh
+                    </Button>
+                </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
                 <Card className="relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500/20 to-transparent rounded-bl-full" />
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -189,29 +224,108 @@ export default function AdminBlockchainPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/20 to-transparent rounded-bl-full" />
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Quick Actions</CardTitle>
-                        <div className="p-2 rounded-lg bg-blue-500/10">
-                            <Zap className="h-4 w-4 text-blue-500" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <Button
-                            onClick={() => processEvents.mutate(100)}
-                            disabled={processEvents.isPending || (unprocessed?.count ?? 0) === 0}
-                            className="w-full"
-                        >
-                            <Play className="w-4 h-4 mr-2" />
-                            Process Events
-                        </Button>
-                    </CardContent>
-                </Card>
+                <AdminWalletGuard fallback={
+                    <Card className="relative overflow-hidden border-dashed border-2">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Sync Control</CardTitle>
+                            <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-xs text-muted-foreground">Connect Admin wallet to process events</p>
+                        </CardContent>
+                    </Card>
+                }>
+                    <Card className="relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/20 to-transparent rounded-bl-full" />
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Sync Control</CardTitle>
+                            <div className="p-2 rounded-lg bg-blue-500/10">
+                                <Zap className="h-4 w-4 text-blue-500" />
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <Button
+                                onClick={() => processEvents.mutate(100)}
+                                disabled={processEvents.isPending || (unprocessed?.count ?? 0) === 0}
+                                className="w-full"
+                            >
+                                <Play className="w-4 h-4 mr-2" />
+                                Process Events
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </AdminWalletGuard>
+
+                <AdminWalletGuard fallback={
+                    <Card className="relative overflow-hidden border-dashed border-2">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Reward Fund</CardTitle>
+                            <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-xs text-muted-foreground">Connect Admin wallet to withdraw rewards</p>
+                        </CardContent>
+                    </Card>
+                }>
+                    <Card className="relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-500/20 to-transparent rounded-bl-full" />
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Reward Fund</CardTitle>
+                            <div className="p-2 rounded-lg bg-purple-500/10">
+                                <Coins className="h-4 w-4 text-purple-500" />
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    if (contracts && contracts.length > 0) {
+                                        setSelectedContract(contracts[0]);
+                                        setIsWithdrawDialogOpen(true);
+                                    }
+                                }}
+                                className="w-full"
+                                disabled={!contracts?.length}
+                            >
+                                <Wallet className="w-4 h-4 mr-2" />
+                                Withdraw Excess
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </AdminWalletGuard>
             </div>
 
+            {/* Withdraw Dialog */}
+            <Dialog open={isWithdrawDialogOpen} onOpenChange={setIsWithdrawDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Withdraw Excess Rewards</DialogTitle>
+                        <DialogDescription>
+                            Withdraw surplus reward tokens from the contract to the admin wallet.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="withdrawAmount">Amount ({selectedContract?.rewardTokenSymbol})</Label>
+                            <Input 
+                                id="withdrawAmount" 
+                                type="number" 
+                                value={withdrawAmount}
+                                onChange={(e) => setWithdrawAmount(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsWithdrawDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={onWithdrawSubmit} disabled={isWritePending}>
+                            {isWritePending ? 'Processing...' : 'Withdraw Rewards'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <div className="space-y-4">
-                <h3 className="font-semibold">Sync Status</h3>
+                <h3 className="font-semibold text-lg">Sync Status</h3>
                 <div className="overflow-hidden rounded-lg border">
                     <Table>
                         <TableHeader className="bg-muted/50">

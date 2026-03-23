@@ -26,6 +26,20 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
     componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
         logger.error('ErrorBoundary caught an error:', error, errorInfo);
+
+        const isChunkLoadFailed =
+            error instanceof Error &&
+            (error.message.includes('Failed to fetch dynamically imported module') ||
+                error.message.includes('Importing a module script failed') ||
+                error.message.includes('error loading dynamically imported module'));
+
+        if (isChunkLoadFailed) {
+            const hasReloaded = window.sessionStorage.getItem('chunk-load-failed-reloaded');
+            if (!hasReloaded) {
+                window.sessionStorage.setItem('chunk-load-failed-reloaded', 'true');
+                window.location.reload();
+            }
+        }
     }
 
     resetError = () => {

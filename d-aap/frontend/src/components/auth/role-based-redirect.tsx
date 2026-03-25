@@ -15,7 +15,7 @@ export function RoleBasedRedirect() {
     const userRole = profile?.role?.toUpperCase();
 
     if (userRole === 'ADMIN') {
-        return <Navigate to="/app/admin" replace />;
+        return <Navigate to="/app/management" replace />;
     }
 
     return <Navigate to="/app/stake" replace />;

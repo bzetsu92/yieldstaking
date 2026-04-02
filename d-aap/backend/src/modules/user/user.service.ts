@@ -130,7 +130,7 @@ export class UserService {
     }
 
     async getUserStatistics(userId: number) {
-        const user = await this.findById(userId);
+        await this.findById(userId);
 
         let stats = await this.prisma.userStatistics.findUnique({
             where: { userId },
@@ -264,18 +264,25 @@ export class UserService {
             throw new BadRequestException(ERR_MESSAGES.AUTH.NO_ACTIVE_CHAIN);
         }
 
-        const wallet = await this.prisma.userWallet.create({
-            data: {
-                userId: user.id,
-                chainId: chain.id,
-                walletAddress: normalizedAddress,
-                isPrimary: !user.wallets || user.wallets.length === 0,
-                isVerified: true,
-                verifiedAt: new Date(),
-            },
+        // Enforce 1 user 1 wallet: delete any existing wallet for this user before creating/linking new one
+        const wallet = await this.prisma.$transaction(async (tx) => {
+            await tx.userWallet.deleteMany({
+                where: { userId: user.id },
+            });
+
+            return tx.userWallet.create({
+                data: {
+                    userId: user.id,
+                    chainId: chain.id,
+                    walletAddress: normalizedAddress,
+                    isPrimary: true,
+                    isVerified: true,
+                    verifiedAt: new Date(),
+                },
+            });
         });
 
-        this.logger.log(`Wallet ${normalizedAddress} linked to user ${userId}`);
+        this.logger.log(`Wallet ${normalizedAddress} linked to user ${userId} (previous wallets removed)`);
 
         return {
             success: true,
@@ -284,8 +291,8 @@ export class UserService {
         };
     }
 
-    async getWallets(userId: number) {
-        const wallets = await this.prisma.userWallet.findMany({
+    async getWallet(userId: number) {
+        const wallet = await this.prisma.userWallet.findFirst({
             where: { userId },
             include: {
                 chain: {
@@ -297,33 +304,8 @@ export class UserService {
                     },
                 },
             },
-            orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
         });
 
-        return wallets;
-    }
-
-    async setPrimaryWallet(userId: number, walletId: number) {
-        const wallet = await this.prisma.userWallet.findFirst({
-            where: { id: walletId, userId },
-        });
-
-        if (!wallet) {
-            throw new NotFoundException("Wallet not found");
-        }
-
-        // Unset all other primary wallets
-        await this.prisma.userWallet.updateMany({
-            where: { userId, isPrimary: true },
-            data: { isPrimary: false },
-        });
-
-        // Set this wallet as primary
-        await this.prisma.userWallet.update({
-            where: { id: walletId },
-            data: { isPrimary: true },
-        });
-
-        return { success: true, message: "Primary wallet updated" };
+        return wallet;
     }
 }

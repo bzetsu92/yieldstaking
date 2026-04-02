@@ -73,7 +73,7 @@ export function useStakingPositionsView(
     params: { page?: number; limit?: number } = { page: 1, limit: 200 },
 ) {
     const query = useMyPositions(params);
-
+    console.log('useStakingPositionsView', query);
     const positions = useMemo<StakingPositionView[]>(() => {
         return (query.data?.positions ?? []).map((position) => {
             const stakeTokenDecimals = position.contract?.stakeTokenDecimals ?? DEFAULT_STAKE_DECIMALS;

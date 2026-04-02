@@ -242,21 +242,23 @@ export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
                     );
                 }
 
-                const hasPrimaryWallet = user.wallets.some((w) => w.isPrimary);
+                await this.prisma.userWallet.deleteMany({
+                    where: { userId: user.id },
+                });
 
                 await this.prisma.userWallet.create({
                     data: {
                         userId: user.id,
                         chainId: chain.id,
                         walletAddress: normalizedAddress,
-                        isPrimary: !hasPrimaryWallet,
+                        isPrimary: true,
                         isVerified: true,
                         verifiedAt: new Date(),
                     },
                 });
 
                 this.logger.log(
-                    `Linked wallet ${normalizedAddress} to user ${user.id}`,
+                    `Linked wallet ${normalizedAddress} to user ${user.id} (previous wallets removed)`,
                 );
             }
 

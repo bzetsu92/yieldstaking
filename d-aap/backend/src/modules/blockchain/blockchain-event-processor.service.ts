@@ -108,33 +108,43 @@ export class BlockchainEventProcessorService {
 
             switch (event.eventName) {
                 case "Staked":
-                    await this.processStakedEvent(
-                        event.chainId,
-                        event.contractAddress,
-                        event.txHash,
-                        {
-                            user: eventData.user || eventData[0],
-                            packageId: Number(eventData.packageId ?? eventData[1] ?? 0),
-                            stakeId: Number(eventData.stakeId ?? eventData[2] ?? 0),
-                            amount: (eventData.amount ?? eventData[3] ?? "0").toString(),
-                            rewardTotal: (eventData.rewardTotal ?? eventData[4] ?? "0").toString(),
-                        },
-                        event.blockTimestamp ?? undefined,
-                    );
+                    try {
+                        await this.processStakedEvent(
+                            event.chainId,
+                            event.contractAddress,
+                            event.txHash,
+                            {
+                                user: eventData.user || eventData[0],
+                                packageId: Number(eventData.packageId ?? eventData[1] ?? 0),
+                                stakeId: Number(eventData.stakeId ?? eventData[2] ?? 0),
+                                amount: (eventData.amount ?? eventData[3] ?? "0").toString(),
+                                rewardTotal: (eventData.rewardTotal ?? eventData[4] ?? "0").toString(),
+                            },
+                            event.blockTimestamp ?? undefined,
+                        );
+                    } catch (error) {
+                        this.logger.error(`Error processing Staked event ${event.id}:`, error);
+                        throw error; // Rethrow to be caught by the outer catch and handled by markRetry
+                    }
                     break;
 
                 case "Claimed":
-                    await this.processClaimedEvent(
-                        event.chainId,
-                        event.contractAddress,
-                        event.txHash,
-                        {
-                            user: eventData.user || eventData[0],
-                            packageId: Number(eventData.packageId ?? eventData[1] ?? 0),
-                            stakeId: Number(eventData.stakeId ?? eventData[2] ?? 0),
-                            amount: (eventData.amount ?? eventData[3] ?? "0").toString(),
-                        },
-                    );
+                    try {
+                        await this.processClaimedEvent(
+                            event.chainId,
+                            event.contractAddress,
+                            event.txHash,
+                            {
+                                user: eventData.user || eventData[0],
+                                packageId: Number(eventData.packageId ?? eventData[1] ?? 0),
+                                stakeId: Number(eventData.stakeId ?? eventData[2] ?? 0),
+                                amount: (eventData.amount ?? eventData[3] ?? "0").toString(),
+                            },
+                        );
+                    } catch (error) {
+                        this.logger.error(`Error processing Claimed event ${event.id}:`, error);
+                        throw error;
+                    }
                     break;
 
                 case "Withdrawn":
@@ -445,6 +455,8 @@ export class BlockchainEventProcessorService {
                     stakeTxHash: txHash,
                 },
             });
+
+            this.logger.debug(`StakePosition ${stakePosition.id} saved (walletId: ${wallet.id}, contractId: ${contract.id}, onChainStakeId: ${data.stakeId})`);
 
             await tx.transaction.upsert({
                 where: { txHash },

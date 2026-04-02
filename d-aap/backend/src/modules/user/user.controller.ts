@@ -72,20 +72,10 @@ export class UserController {
         );
     }
 
-    @Get("wallets")
-    @ApiOperation({ summary: "Get all wallets linked to user account" })
-    @ApiResponse({ status: 200, description: "Wallets retrieved successfully" })
-    async getWallets(@Request() req: AuthenticatedRequest) {
-        return this.userService.getWallets(req.user.id);
-    }
-
-    @Post("wallets/:walletId/set-primary")
-    @ApiOperation({ summary: "Set a wallet as primary" })
-    @ApiResponse({ status: 200, description: "Primary wallet updated" })
-    async setPrimaryWallet(
-        @Request() req: AuthenticatedRequest,
-        @Param("walletId", ParseIntPipe) walletId: number,
-    ) {
-        return this.userService.setPrimaryWallet(req.user.id, walletId);
+    @Get("wallet")
+    @ApiOperation({ summary: "Get the wallet linked to user account" })
+    @ApiResponse({ status: 200, description: "Wallet retrieved successfully" })
+    async getWallet(@Request() req: AuthenticatedRequest) {
+        return this.userService.getWallet(req.user.id);
     }
 }

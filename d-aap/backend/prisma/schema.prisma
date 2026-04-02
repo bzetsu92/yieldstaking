@@ -76,11 +76,11 @@ model OAuthAccount {
 
 model UserWallet {
   id             Int             @id @default(autoincrement())
-  userId         Int             @map("user_id")
+  userId         Int             @unique @map("user_id")
   chainId        Int             @map("chain_id")
   walletAddress  String          @unique @map("wallet_address") @db.VarChar(42)
   isVerified     Boolean         @default(false) @map("is_verified")
-  isPrimary      Boolean         @default(false) @map("is_primary")
+  isPrimary      Boolean         @default(true) @map("is_primary")
   verificationTx String?         @unique @map("verification_tx") @db.VarChar(66)
   verifiedAt     DateTime?       @map("verified_at")
   walletType     String          @default("MetaMask") @map("wallet_type") @db.VarChar(50)
@@ -91,7 +91,6 @@ model UserWallet {
   chain          Chain           @relation(fields: [chainId], references: [id])
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, isPrimary])
   @@index([chainId])
   @@map("user_wallets")
 }

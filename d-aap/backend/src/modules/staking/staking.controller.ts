@@ -112,7 +112,6 @@ export class StakingController {
             req.user.id,
         );
 
-        console.log(wallet);
         if (!wallet) {
             return {
                 positions: [],

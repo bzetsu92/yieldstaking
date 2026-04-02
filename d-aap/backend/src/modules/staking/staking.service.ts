@@ -17,6 +17,12 @@ export class StakingService {
         });
     }
 
+    async getUserWallets(userId: number) {
+        return this.prisma.userWallet.findMany({
+            where: { userId },
+        });
+    }
+
     async getContracts(chainId?: number) {
         return this.prisma.stakingContract.findMany({
             where: chainId ? { chainId } : undefined,
@@ -243,7 +249,7 @@ export class StakingService {
 
     async getStakePositionsSummary(walletAddress: string) {
         const normalizedAddress = walletAddress.toLowerCase();
-        
+
         const positions = await this.prisma.stakePosition.findMany({
             where: {
                 wallet: {

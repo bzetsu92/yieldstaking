@@ -118,3 +118,28 @@ export function formatTokenAmount(
         ? `${whole.toLocaleString()}.${fractionSuffix}`
         : whole.toLocaleString();
 }
+
+export function formatTokenAmountWithFloor(
+    value: bigint | string | number | undefined | null,
+    decimals: number,
+    maximumFractionDigits: number = 4,
+): string {
+    const formatted = formatTokenAmount(value, decimals, maximumFractionDigits);
+
+    if (formatted !== '0' || maximumFractionDigits <= 0) {
+        return formatted;
+    }
+
+    let bigValue: bigint;
+    try {
+        bigValue = BigInt(value?.toString() ?? '0');
+    } catch {
+        return formatted;
+    }
+
+    if (bigValue <= 0n) {
+        return formatted;
+    }
+
+    return `< 0.${'0'.repeat(Math.max(maximumFractionDigits - 1, 0))}1`;
+}

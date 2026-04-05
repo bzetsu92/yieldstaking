@@ -52,10 +52,7 @@ export class AuthController {
 
     @Post("email/register")
     async emailRegister(@Body() registerDto: EmailRegisterDto) {
-        return {
-            message: SUCCESS_MESSAGES.AUTH.ACCOUNT_CREATED,
-            viewOnly: true,
-        };
+        return this.authService.registerWithEmail(registerDto);
     }
 
     @UseGuards(LocalAuthGuard)

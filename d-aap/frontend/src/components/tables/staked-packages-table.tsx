@@ -9,7 +9,7 @@ import {
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { ExternalLink, Unlock, Clock } from 'lucide-react';
 
-import { formatTokenAmount } from '@/lib/utils/format';
+import { formatTokenAmount, formatTokenAmountWithFloor } from '@/lib/utils/format';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +42,8 @@ interface StakedPackagesTableProps {
     contractAddress?: string;
     stakeSymbol?: string;
     rewardSymbol?: string;
+    stakeDecimals?: number;
+    rewardDecimals?: number;
 }
 
 export function StakedPackagesTable({ 
@@ -52,6 +54,8 @@ export function StakedPackagesTable({
     contractAddress,
     stakeSymbol = 'AUR',
     rewardSymbol = 'USDT',
+    stakeDecimals = 18,
+    rewardDecimals = 6,
 }: StakedPackagesTableProps) {
     const columns: ColumnDef<StakedPackageItem>[] = React.useMemo(() => [
         {
@@ -76,7 +80,7 @@ export function StakedPackagesTable({
                 const amount = BigInt(row.original.stakedAmount || '0');
                 return (
                     <div className="font-medium">
-                        {formatTokenAmount(amount, 18, 2)} AUR
+                        {formatTokenAmount(amount, stakeDecimals, 2)} {stakeSymbol}
                     </div>
                 );
             },
@@ -86,9 +90,11 @@ export function StakedPackagesTable({
             header: 'Claimable',
             cell: ({ row }) => {
                 const amount = BigInt(row.original.claimable || '0');
+                const displayAmount = formatTokenAmountWithFloor(amount, rewardDecimals, 4);
                 return (
                     <span className="font-medium text-green-600 dark:text-green-400">
-                        +{formatTokenAmount(amount, 18, 4)} USDT
+                        {displayAmount.startsWith('< ') ? displayAmount : `+${displayAmount}`}{' '}
+                        {rewardSymbol}
                     </span>
                 );
             },
@@ -127,7 +133,7 @@ export function StakedPackagesTable({
                 </a>
             ),
         },
-    ], [explorerUrl, contractAddress, stakeSymbol, rewardSymbol]);
+    ], [contractAddress, explorerUrl, rewardDecimals, rewardSymbol, stakeDecimals, stakeSymbol]);
 
     const table = useReactTable({
         data,

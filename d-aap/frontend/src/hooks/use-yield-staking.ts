@@ -33,6 +33,15 @@ export interface UserStake {
     lastClaimTimestamp: bigint;
 }
 
+function isTransactionRejected(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+        return false;
+    }
+
+    const code = (error as { code?: number | string }).code;
+    return code === 4001 || code === 'ACTION_REJECTED';
+}
+
 async function simulateWriteContract(params: {
     chainId: number;
     stakingConfig: ReturnType<typeof getYieldStakingContractConfig>;
@@ -41,7 +50,7 @@ async function simulateWriteContract(params: {
     account: Address;
     gasCap: bigint;
     fallbackGas: bigint;
-    writeContract: ReturnType<typeof useWriteContract>['writeContract'];
+    writeContractAsync: ReturnType<typeof useWriteContract>['writeContractAsync'];
 }) {
     const publicClient = createPublicClientForChain(params.chainId as typeof DEFAULT_CHAIN_ID);
 
@@ -58,13 +67,17 @@ async function simulateWriteContract(params: {
                 ? params.gasCap
                 : simulation.request.gas || params.fallbackGas;
 
-        params.writeContract({
+        return await params.writeContractAsync({
             ...params.stakingConfig,
             functionName: params.functionName,
             args: params.args,
             gas,
         });
     } catch (err) {
+        if (isTransactionRejected(err)) {
+            throw err;
+        }
+
         if (err instanceof BaseError) {
             const revertError = err.walk(
                 (error) => error instanceof ContractFunctionRevertedError,
@@ -196,7 +209,7 @@ export function useYieldStaking() {
             .filter((pkg): pkg is StakePackage => pkg !== null && pkg.enabled);
     }, [packageResults.data]);
 
-    const { writeContract, data: txHash, isPending: isWritePending, reset } = useWriteContract();
+    const { writeContractAsync, data: txHash, isPending: isWritePending, reset } = useWriteContract();
 
     const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
         hash: txHash,
@@ -228,14 +241,14 @@ export function useYieldStaking() {
                 account,
             });
             const gas = simulation.request.gas && simulation.request.gas > 1_000_000n ? 1_000_000n : simulation.request.gas || 500_000n;
-            writeContract({
+            await writeContractAsync({
                 ...tokenConfig,
                 functionName: 'approve',
                 args: [stakingAddress, approveAmount],
                 gas,
             });
         },
-        [writeContract, tokenConfig, stakingAddress, chainId, ensureReadyToWrite]
+        [writeContractAsync, tokenConfig, stakingAddress, chainId, ensureReadyToWrite]
     );
 
     const stake = useCallback(
@@ -270,13 +283,17 @@ export function useYieldStaking() {
                     account,
                 });
                 const gas = simulation.request.gas && simulation.request.gas > 1_000_000n ? 1_000_000n : simulation.request.gas || 700_000n;
-                writeContract({
+                await writeContractAsync({
                     ...stakingConfig,
                     functionName: 'stake',
                     args: [amountWei, packageId],
                     gas,
                 });
             } catch (err) {
+                if (isTransactionRejected(err)) {
+                    throw err;
+                }
+
                 if (err instanceof BaseError) {
                     const revertError = err.walk(e => e instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | undefined;
                     const reason = revertError?.data?.errorName || revertError?.shortMessage || 'Transaction reverted';
@@ -285,7 +302,7 @@ export function useYieldStaking() {
                 throw err as Error;
             }
         },
-        [writeContract, stakingConfig, tokenDecimals, chainId, ensureReadyToWrite, isPaused, minStakeAmount, maxStakePerUser, userTotalStakes, tokenAllowance]
+        [writeContractAsync, stakingConfig, tokenDecimals, chainId, ensureReadyToWrite, isPaused, minStakeAmount, maxStakePerUser, userTotalStakes, tokenAllowance]
     );
 
     const claim = useCallback(
@@ -300,13 +317,17 @@ export function useYieldStaking() {
                     account,
                 });
                 const gas = simulation.request.gas && simulation.request.gas > 900_000n ? 900_000n : simulation.request.gas || 600_000n;
-                writeContract({
+                await writeContractAsync({
                     ...stakingConfig,
                     functionName: 'claim',
                     args: [packageId, stakeId],
                     gas,
                 });
             } catch (err) {
+                if (isTransactionRejected(err)) {
+                    throw err;
+                }
+
                 if (err instanceof BaseError) {
                     const revertError = err.walk(e => e instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | undefined;
                     const reason = revertError?.data?.errorName || revertError?.shortMessage || 'Transaction reverted';
@@ -315,7 +336,7 @@ export function useYieldStaking() {
                 throw err as Error;
             }
         },
-        [writeContract, stakingConfig, chainId, ensureReadyToWrite]
+        [writeContractAsync, stakingConfig, chainId, ensureReadyToWrite]
     );
 
     const withdraw = useCallback(
@@ -330,13 +351,17 @@ export function useYieldStaking() {
                     account,
                 });
                 const gas = simulation.request.gas && simulation.request.gas > 1_000_000n ? 1_000_000n : simulation.request.gas || 800_000n;
-                writeContract({
+                await writeContractAsync({
                     ...stakingConfig,
                     functionName: 'withdraw',
                     args: [packageId, stakeId],
                     gas,
                 });
             } catch (err) {
+                if (isTransactionRejected(err)) {
+                    throw err;
+                }
+
                 if (err instanceof BaseError) {
                     const revertError = err.walk(e => e instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | undefined;
                     const reason = revertError?.data?.errorName || revertError?.shortMessage || 'Transaction reverted';
@@ -345,7 +370,7 @@ export function useYieldStaking() {
                 throw err as Error;
             }
         },
-        [writeContract, stakingConfig, chainId, ensureReadyToWrite]
+        [writeContractAsync, stakingConfig, chainId, ensureReadyToWrite]
     );
 
     const refetchAll = useCallback(() => {
@@ -393,7 +418,7 @@ export function useStakeWriter() {
     const chainId = useChainId() || DEFAULT_CHAIN_ID;
     const stakingConfig = useMemo(() => getYieldStakingContractConfig(chainId), [chainId]);
 
-    const { writeContract, data: txHash, isPending: isWritePending, reset } = useWriteContract();
+    const { writeContractAsync, data: txHash, isPending: isWritePending, reset } = useWriteContract();
     const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
 
     const ensureReadyToWrite = useCallback((): Address => {
@@ -421,10 +446,10 @@ export function useStakeWriter() {
                 account,
                 gasCap: 900_000n,
                 fallbackGas: 600_000n,
-                writeContract,
+                writeContractAsync,
             });
         },
-        [chainId, ensureReadyToWrite, stakingConfig, writeContract]
+        [chainId, ensureReadyToWrite, stakingConfig, writeContractAsync]
     );
 
     const withdraw = useCallback(
@@ -438,10 +463,10 @@ export function useStakeWriter() {
                 account,
                 gasCap: 1_000_000n,
                 fallbackGas: 800_000n,
-                writeContract,
+                writeContractAsync,
             });
         },
-        [chainId, ensureReadyToWrite, stakingConfig, writeContract]
+        [chainId, ensureReadyToWrite, stakingConfig, writeContractAsync]
     );
 
     return { claim, withdraw, isWritePending, isConfirming, isConfirmed, reset };

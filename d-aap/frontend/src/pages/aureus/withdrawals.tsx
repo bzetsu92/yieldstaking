@@ -10,7 +10,7 @@ import { StakedPackagesTable, type StakedPackageItem } from '@/components/tables
 import { WalletDisplay } from '@/components/wallet';
 import { useStakingPositionsView } from '@/hooks';
 import { useStakeWriter } from '@/hooks/use-yield-staking';
-import { formatTokenAmount } from '@/lib/utils/format';
+import { formatTokenAmount, formatTokenAmountWithFloor } from '@/lib/utils/format';
 import { hasAccountAuth } from '@/lib/auth/auth';
 import { DEFAULT_CHAIN_ID } from '@/lib/config/chains';
 import { EXPLORER_ENDPOINTS } from '@/lib/constants/rpc';
@@ -75,6 +75,7 @@ export default function WithdrawalsPage() {
             await claim(selected.packageId, selected.stakeId);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Claim failed');
+            reset();
             setProcessingId(null);
             setActionType(null);
         }
@@ -90,6 +91,7 @@ export default function WithdrawalsPage() {
             await withdraw(selected.packageId, selected.stakeId);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Withdraw failed');
+            reset();
             setProcessingId(null);
             setActionType(null);
         }
@@ -99,6 +101,20 @@ export default function WithdrawalsPage() {
     const explorerUrl = EXPLORER_ENDPOINTS[chainId] || EXPLORER_ENDPOINTS[DEFAULT_CHAIN_ID];
     const stakeSymbol = selected?.stakeSymbol ?? metadata.stakeSymbol;
     const rewardSymbol = selected?.rewardSymbol ?? metadata.rewardSymbol;
+    const claimableDisplay = selected
+        ? formatTokenAmountWithFloor(
+              selected.claimableRewardRaw,
+              selected.rewardTokenDecimals,
+              4,
+          )
+        : '0';
+    const showsTinyClaimable =
+        selected !== null &&
+        selected.claimableRewardRaw > 0n &&
+        claimableDisplay.startsWith('< ');
+    const claimableLabel = claimableDisplay.startsWith('< ')
+        ? claimableDisplay
+        : `+${claimableDisplay}`;
 
     if (!isAuthenticated) {
         return (
@@ -114,7 +130,7 @@ export default function WithdrawalsPage() {
     }
 
     return (
-        <div className="flex flex-1 flex-col py-6 px-4 lg:px-6">
+        <div className="flex flex-1 flex-col px-4 py-6 lg:px-6">
             <div className="mb-6">
                 <h1 className="text-2xl font-bold">Withdraw & Claim</h1>
                 <p className="text-muted-foreground">Manage your staked positions and claim rewards</p>
@@ -136,8 +152,8 @@ export default function WithdrawalsPage() {
                 </div>
             )}
 
-            <div className="grid gap-6 lg:grid-cols-10">
-                <div className="lg:col-span-6">
+            <div className="grid gap-6 xl:grid-cols-10">
+                <div className="min-w-0 xl:col-span-6">
                     <StakedPackagesTable
                         data={tableData}
                         selectedId={selectedStake || activePositions[0]?.id || null}
@@ -146,9 +162,11 @@ export default function WithdrawalsPage() {
                         contractAddress={metadata.contractAddress}
                         stakeSymbol={stakeSymbol}
                         rewardSymbol={rewardSymbol}
+                        stakeDecimals={selected?.stakeTokenDecimals ?? activePositions[0]?.stakeTokenDecimals ?? 18}
+                        rewardDecimals={selected?.rewardTokenDecimals ?? activePositions[0]?.rewardTokenDecimals ?? 6}
                     />
                 </div>
-                <div className="lg:col-span-4">
+                <div className="min-w-0 xl:col-span-4">
                     <Card>
                         <CardContent className="p-6 space-y-4">
                             {selected ? (
@@ -157,17 +175,14 @@ export default function WithdrawalsPage() {
                                         <div className="mb-4 flex items-center justify-between">
                                             <div className="flex items-center gap-3">
                                                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-yellow-600 text-sm font-bold text-white">
-                                                    AUR
+                                                    {selected.stakeSymbol.slice(0, 3).toUpperCase()}
                                                 </div>
                                                 <div>
                                                     <div className="font-semibold">
                                                         {selected.lockPeriodLabel} Package
                                                     </div>
                                                     <div className="text-sm text-muted-foreground">
-                                                        APY:{' '}
-                                                        <span className="text-primary font-semibold">
-                                                            {selected.apy}%
-                                                        </span>
+                                                        Principal in {selected.stakeSymbol}, rewards in {selected.rewardSymbol}
                                                     </div>
                                                 </div>
                                             </div>
@@ -189,25 +204,41 @@ export default function WithdrawalsPage() {
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Staked Amount</span>
                                                 <span className="font-semibold">
-                                                    {formatTokenAmount(selected.principalRaw, 18, 2)} AUR
+                                                    {formatTokenAmount(
+                                                        selected.principalRaw,
+                                                        selected.stakeTokenDecimals,
+                                                        2,
+                                                    )}{' '}
+                                                    {selected.stakeSymbol}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Total Rewards</span>
                                                 <span className="font-semibold">
-                                                    {formatTokenAmount(selected.rewardTotalRaw, 18, 4)} USDT
+                                                    {formatTokenAmount(
+                                                        selected.rewardTotalRaw,
+                                                        selected.rewardTokenDecimals,
+                                                        4,
+                                                    )}{' '}
+                                                    {selected.rewardSymbol}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Claimed</span>
                                                 <span className="font-semibold">
-                                                    {formatTokenAmount(selected.rewardClaimedRaw, 18, 4)} USDT
+                                                    {formatTokenAmount(
+                                                        selected.rewardClaimedRaw,
+                                                        selected.rewardTokenDecimals,
+                                                        4,
+                                                    )}{' '}
+                                                    {selected.rewardSymbol}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Claimable Now</span>
                                                 <span className="font-semibold text-green-500">
-                                                    +{formatTokenAmount(selected.claimableRewardRaw, 18, 4)} USDT
+                                                    {claimableLabel}{' '}
+                                                    {selected.rewardSymbol}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between text-sm">
@@ -219,7 +250,7 @@ export default function WithdrawalsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid gap-3 sm:grid-cols-2">
                                         <Button
                                             variant="outline"
                                             className="h-12"
@@ -255,6 +286,12 @@ export default function WithdrawalsPage() {
                                         <div className="text-center text-sm text-muted-foreground">
                                             Withdrawal is available after the unlock date. Reward
                                             claims remain available anytime.
+                                        </div>
+                                    )}
+                                    {showsTinyClaimable && (
+                                        <div className="text-center text-sm text-muted-foreground">
+                                            Rewards are accruing already. Values smaller than 0.0001
+                                            display as &lt; 0.0001.
                                         </div>
                                     )}
                                 </>

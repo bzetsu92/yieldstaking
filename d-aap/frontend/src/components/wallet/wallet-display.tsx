@@ -1,8 +1,8 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { LogOut } from 'lucide-react';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { useDisconnect } from 'wagmi';
+import { useAccount, useDisconnect } from 'wagmi';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -16,12 +16,48 @@ import { useMounted } from '@/hooks/use-mounted';
 import { hasAccountAuth } from '@/lib/auth';
 import { useAuthentication } from '@/hooks/use-authentication';
 import { handleModalError } from '@/lib/utils/modal-error-handler';
+import { useAuthProfile } from '@/hooks/use-api-queries';
+import { useAdminWalletAccess } from '@/hooks/use-admin-wallet-access';
 
 function WalletDisplayComponent() {
     const mounted = useMounted();
+    const { address, isConnected } = useAccount();
     const { disconnect } = useDisconnect();
     const { signOut } = useAuthentication();
     const hasAccount = hasAccountAuth();
+    const { data: profile } = useAuthProfile();
+    const { isAdminWallet, isChecking, isSupportedChain } = useAdminWalletAccess();
+    const rejectedAdminWalletRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (profile?.role !== 'ADMIN' || !isConnected || !address) {
+            rejectedAdminWalletRef.current = null;
+            return;
+        }
+
+        if (isChecking) {
+            return;
+        }
+
+        if (!isSupportedChain || !isAdminWallet) {
+            const normalizedAddress = address.toLowerCase();
+
+            if (rejectedAdminWalletRef.current === normalizedAddress) {
+                return;
+            }
+
+            rejectedAdminWalletRef.current = normalizedAddress;
+            toast.error('Admin wallet required', {
+                description: isSupportedChain
+                    ? 'This wallet does not have admin permissions for the staking contract.'
+                    : 'Please switch to Sepolia and connect the assigned admin wallet.',
+            });
+            disconnect();
+            return;
+        }
+
+        rejectedAdminWalletRef.current = null;
+    }, [address, disconnect, isAdminWallet, isChecking, isConnected, isSupportedChain, profile?.role]);
 
     const handleDisconnect = useCallback(() => {
         try {

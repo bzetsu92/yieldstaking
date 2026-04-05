@@ -40,9 +40,8 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<'div'
             try {
                 const result = await registerMutation.mutateAsync({ name, email, password });
 
-                toast.success('Registration submitted', {
-                    description:
-                        result.message || 'Your account request has been recorded successfully.',
+                toast.success('Registration successful', {
+                    description: result.message || 'Your account has been created successfully.',
                 });
 
                 navigate('/login', {

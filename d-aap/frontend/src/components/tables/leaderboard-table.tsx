@@ -22,18 +22,21 @@ import {
 export interface LeaderboardItem {
     rank: number;
     address: string;
-    staked: number;
-    rewards: number;
+    fullAddress: string;
+    staked: string;
+    activeStakes: number;
 }
 
 interface LeaderboardTableProps {
     data: LeaderboardItem[];
     explorerUrl?: string;
+    stakeSymbol?: string;
 }
 
 export function LeaderboardTable({ 
     data, 
-    explorerUrl = 'https://sepolia.etherscan.io'
+    explorerUrl = 'https://sepolia.etherscan.io',
+    stakeSymbol = 'AUR',
 }: LeaderboardTableProps) {
     const columns: ColumnDef<LeaderboardItem>[] = React.useMemo(() => [
         {
@@ -54,13 +57,21 @@ export function LeaderboardTable({
         },
         {
             accessorKey: 'address',
-            header: 'Staker',
+            header: 'Wallet',
             cell: ({ row }) => (
                 <div className="flex items-center gap-1">
-                    <span className="font-mono text-sm">{row.original.address}</span>
+                    <a
+                        href={`${explorerUrl}/address/${row.original.fullAddress}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-sm hover:text-primary"
+                        title={row.original.fullAddress}
+                    >
+                        {row.original.address}
+                    </a>
                     <Copy 
                         className="h-3 w-3 text-muted-foreground cursor-pointer hover:text-foreground" 
-                        onClick={() => navigator.clipboard.writeText(row.original.address)}
+                        onClick={() => navigator.clipboard.writeText(row.original.fullAddress)}
                     />
                 </div>
             ),
@@ -70,20 +81,20 @@ export function LeaderboardTable({
             header: 'Staked',
             cell: ({ row }) => (
                 <span className="font-medium text-green-500">
-                    {row.original.staked.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {row.original.staked} {stakeSymbol}
                 </span>
             ),
         },
         {
-            accessorKey: 'rewards',
-            header: 'Est. Rewards',
+            accessorKey: 'activeStakes',
+            header: 'Active Stakes',
             cell: ({ row }) => (
                 <span>
-                    ${row.original.rewards.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {row.original.activeStakes}
                 </span>
             ),
         }
-    ], [explorerUrl]);
+    ], [explorerUrl, stakeSymbol]);
 
     const table = useReactTable({
         data,

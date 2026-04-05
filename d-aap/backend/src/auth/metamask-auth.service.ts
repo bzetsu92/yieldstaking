@@ -15,6 +15,11 @@ import { ethers } from "ethers";
 import { ERR_MESSAGES } from "../constants/messages.constant";
 import { PrismaService } from "../prisma/prisma.service";
 
+const ACCESS_CONTROL_ABI = [
+    "function hasRole(bytes32 role, address account) view returns (bool)",
+];
+const ADMIN_ROLE_HASH = ethers.keccak256(ethers.toUtf8Bytes("ADMIN_ROLE"));
+
 @Injectable()
 export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(MetaMaskAuthService.name);
@@ -157,6 +162,8 @@ export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
             );
         }
 
+        const walletRole = await this.resolveWalletRole(normalizedAddress);
+
         // Find user by wallet address (any wallet, not just primary)
         let user = await this.prisma.user.findFirst({
             where: {
@@ -189,7 +196,7 @@ export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
                     name: `User_${normalizedAddress.slice(0, 8)}`,
                     email: null,
                     authMethod: "WALLET",
-                    role: "USER",
+                    role: walletRole,
                     status: "ACTIVE",
                     wallets: {
                         create: {
@@ -277,11 +284,24 @@ export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
             }
         }
 
+        if (walletRole === "ADMIN" && user.role !== "ADMIN") {
+            await this.prisma.user.update({
+                where: { id: user.id },
+                data: { role: "ADMIN" },
+            });
+            user = {
+                ...user,
+                role: "ADMIN",
+            };
+        }
+
+        const effectiveRole = walletRole === "ADMIN" ? "ADMIN" : user.role;
+
         const payload = {
             id: user.id,
             email: user.email,
             name: user.name,
-            role: user.role,
+            role: effectiveRole,
         };
 
         const accessToken = this.jwtService.sign(payload, {
@@ -299,10 +319,67 @@ export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
                 id: user.id,
                 email: user.email,
                 name: user.name,
-                role: user.role,
+                role: effectiveRole,
                 walletAddress: normalizedAddress,
             },
         };
+    }
+
+    private async resolveWalletRole(
+        walletAddress: string,
+    ): Promise<"ADMIN" | "USER"> {
+        const contracts = await this.prisma.stakingContract.findMany({
+            where: {
+                chain: {
+                    is: {
+                        isActive: true,
+                    },
+                },
+            },
+            select: {
+                address: true,
+                chain: {
+                    select: {
+                        id: true,
+                        rpcUrl: true,
+                    },
+                },
+            },
+        });
+
+        for (const contract of contracts) {
+            const rpcUrl = contract.chain.rpcUrl;
+
+            if (!rpcUrl) {
+                continue;
+            }
+
+            try {
+                const provider = new ethers.JsonRpcProvider(rpcUrl);
+                const accessControl = new ethers.Contract(
+                    contract.address,
+                    ACCESS_CONTROL_ABI,
+                    provider,
+                );
+
+                const [hasAdminRole, hasDefaultAdminRole] = await Promise.all([
+                    accessControl.hasRole(ADMIN_ROLE_HASH, walletAddress),
+                    accessControl.hasRole(ethers.ZeroHash, walletAddress),
+                ]);
+
+                if (hasAdminRole || hasDefaultAdminRole) {
+                    return "ADMIN";
+                }
+            } catch (error) {
+                const message =
+                    error instanceof Error ? error.message : String(error);
+                this.logger.warn(
+                    `Failed to resolve admin role for wallet ${walletAddress} on contract ${contract.address} (chain ${contract.chain.id}): ${message}`,
+                );
+            }
+        }
+
+        return "USER";
     }
 
     private async cleanupExpiredNonces() {

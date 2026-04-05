@@ -13,6 +13,7 @@ import { compare, hash } from "bcrypt";
 
 import { UserService } from "../modules/user/user.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { EmailRegisterDto } from "./dto/auth.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { UserPrincipal } from "./interface/user-principal.interface";
 import { ERR_MESSAGES, SUCCESS_MESSAGES } from "../constants/messages.constant";
@@ -110,6 +111,65 @@ export class AuthService {
             refresh_token: refreshToken,
             user,
         };
+    }
+
+    async registerWithEmail(
+        registerDto: EmailRegisterDto,
+    ): Promise<{ message: string }> {
+        const email = registerDto.email.trim().toLowerCase();
+        const name = registerDto.name.trim();
+
+        const existingUser = await this.prisma.user.findFirst({
+            where: {
+                email,
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                authMethod: true,
+                password: true,
+            },
+        });
+
+        const hashedPassword = await hash(registerDto.password, 12);
+
+        if (existingUser?.password) {
+            throw new BadRequestException(ERR_MESSAGES.AUTH.EMAIL_ALREADY_EXISTS);
+        }
+
+        if (existingUser) {
+            await this.prisma.user.update({
+                where: { id: existingUser.id },
+                data: {
+                    name,
+                    password: hashedPassword,
+                    authMethod:
+                        existingUser.authMethod === "OAUTH_GOOGLE"
+                            ? "BOTH"
+                            : "EMAIL_PASSWORD",
+                    emailVerified: true,
+                    emailVerifiedAt: new Date(),
+                    status: UserStatus.ACTIVE,
+                },
+            });
+
+            return { message: SUCCESS_MESSAGES.AUTH.ACCOUNT_CREATED };
+        }
+
+        await this.prisma.user.create({
+            data: {
+                email,
+                name,
+                password: hashedPassword,
+                authMethod: "EMAIL_PASSWORD",
+                role: "USER",
+                status: UserStatus.ACTIVE,
+                emailVerified: true,
+                emailVerifiedAt: new Date(),
+            },
+        });
+
+        return { message: SUCCESS_MESSAGES.AUTH.ACCOUNT_CREATED };
     }
 
     async refreshToken(

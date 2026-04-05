@@ -1,5 +1,10 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { UserRole, UserStatus, TransactionType } from "@prisma/client";
+import {
+    Prisma,
+    UserRole,
+    UserStatus,
+    TransactionType,
+} from "@prisma/client";
 
 import { ERR_MESSAGES } from "../../constants/messages.constant";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -14,6 +19,20 @@ export class AdminService {
         private blockchain: BlockchainService,
     ) {}
 
+    private sumOutstandingRewards(
+        positions: Array<{ rewardTotal: string; rewardClaimed: string }>,
+    ): bigint {
+        return positions.reduce(
+            (sum, position) => {
+                const outstanding =
+                    BigInt(position.rewardTotal || "0") -
+                    BigInt(position.rewardClaimed || "0");
+                return sum + (outstanding > 0n ? outstanding : 0n);
+            },
+            BigInt(0),
+        );
+    }
+
     async getPlatformStatistics() {
         const [
             totalUsers,
@@ -24,6 +43,7 @@ export class AdminService {
             activePositions,
             totalTransactions,
             contracts,
+            activeRewardPositions,
         ] = await Promise.all([
             this.prisma.user.count(),
             this.prisma.userWallet.count(),
@@ -33,7 +53,14 @@ export class AdminService {
             this.prisma.stakePosition.count({ where: { isWithdrawn: false } }),
             this.prisma.transaction.count(),
             this.prisma.stakingContract.findMany({
-                select: { totalLocked: true, totalRewardDebt: true },
+                select: { totalLocked: true },
+            }),
+            this.prisma.stakePosition.findMany({
+                where: { isWithdrawn: false },
+                select: {
+                    rewardTotal: true,
+                    rewardClaimed: true,
+                },
             }),
         ]);
 
@@ -41,10 +68,7 @@ export class AdminService {
             (sum, c) => sum + BigInt(c.totalLocked || "0"),
             BigInt(0),
         );
-        const totalRewardDebt = contracts.reduce(
-            (sum, c) => sum + BigInt(c.totalRewardDebt || "0"),
-            BigInt(0),
-        );
+        const totalRewardDebt = this.sumOutstandingRewards(activeRewardPositions);
 
         const uniqueStakers = await this.prisma.stakePosition.groupBy({
             by: ["walletId"],
@@ -95,19 +119,34 @@ export class AdminService {
                 _count: {
                     select: { stakePositions: true },
                 },
+                stakePositions: {
+                    where: { isWithdrawn: false },
+                    select: {
+                        rewardTotal: true,
+                        rewardClaimed: true,
+                    },
+                },
             },
             orderBy: { createdAt: "desc" },
         });
 
-        return contracts.map((contract: any) => ({
-            ...contract,
-            minStakeAmount: contract.minStakeAmount?.toString() || "0",
-            maxStakePerUser: contract.maxStakePerUser?.toString() || "0",
-            explorerUrl:
-                contract.address && contract.chain.explorerUrl
-                    ? `${contract.chain.explorerUrl}/address/${contract.address}`
-                    : null,
-        }));
+        return contracts.map((contract: any) => {
+            const totalRewardDebt = this.sumOutstandingRewards(
+                contract.stakePositions,
+            );
+            const { stakePositions, ...contractData } = contract;
+
+            return {
+                ...contractData,
+                totalRewardDebt: totalRewardDebt.toString(),
+                minStakeAmount: contract.minStakeAmount?.toString() || "0",
+                maxStakePerUser: contract.maxStakePerUser?.toString() || "0",
+                explorerUrl:
+                    contract.address && contract.chain.explorerUrl
+                        ? `${contract.chain.explorerUrl}/address/${contract.address}`
+                        : null,
+            };
+        });
     }
 
     async getPackages(contractId?: number) {
@@ -130,37 +169,28 @@ export class AdminService {
 
     async getPositions(
         page: number = 1,
-        limit: number = 20,
+        limit?: number,
         walletAddress?: string,
         isWithdrawn?: boolean,
         userId?: number,
         search?: string,
     ) {
-        const skip = (page - 1) * limit;
+        const normalizedLimit =
+            limit && limit > 0 ? Math.trunc(limit) : undefined;
+        const normalizedPage = normalizedLimit
+            ? Math.max(Math.trunc(page), 1)
+            : 1;
+        const skip = normalizedLimit
+            ? (normalizedPage - 1) * normalizedLimit
+            : undefined;
 
-        const where: {
-            wallet?: {
-                walletAddress?: { equals: string; mode: "insensitive" };
-                userId?: number;
-                OR?: Array<{
-                    walletAddress?: { contains: string; mode: "insensitive" };
-                    user?: {
-                        OR: Array<{
-                            name?: { contains: string; mode: "insensitive" };
-                            email?: { contains: string; mode: "insensitive" };
-                        }>;
-                    };
-                }>;
-            };
-            isWithdrawn?: boolean;
-        } = {};
+        const where: Prisma.StakePositionWhereInput = {};
+        const walletWhere: Prisma.UserWalletWhereInput = {};
 
         if (walletAddress) {
-            where.wallet = {
-                walletAddress: {
-                    equals: walletAddress.toLowerCase(),
-                    mode: "insensitive",
-                },
+            walletWhere.walletAddress = {
+                equals: walletAddress.toLowerCase(),
+                mode: "insensitive",
             };
         }
 
@@ -168,40 +198,41 @@ export class AdminService {
             where.isWithdrawn = isWithdrawn;
         }
 
-        if (userId) {
-            where.wallet = { ...where.wallet, userId };
+        if (userId !== undefined) {
+            walletWhere.userId = userId;
         }
 
         if (search) {
-            where.wallet = {
-                ...where.wallet,
-                OR: [
-                    {
-                        walletAddress: {
-                            contains: search.toLowerCase(),
-                            mode: "insensitive",
-                        },
+            walletWhere.OR = [
+                {
+                    walletAddress: {
+                        contains: search.toLowerCase(),
+                        mode: "insensitive",
                     },
-                    {
-                        user: {
-                            OR: [
-                                {
-                                    name: {
-                                        contains: search,
-                                        mode: "insensitive",
-                                    },
+                },
+                {
+                    user: {
+                        OR: [
+                            {
+                                name: {
+                                    contains: search,
+                                    mode: "insensitive",
                                 },
-                                {
-                                    email: {
-                                        contains: search,
-                                        mode: "insensitive",
-                                    },
+                            },
+                            {
+                                email: {
+                                    contains: search,
+                                    mode: "insensitive",
                                 },
-                            ],
-                        },
+                            },
+                        ],
                     },
-                ],
-            };
+                },
+            ];
+        }
+
+        if (Object.keys(walletWhere).length > 0) {
+            where.wallet = walletWhere;
         }
 
         const [positions, total] = await Promise.all([
@@ -233,7 +264,7 @@ export class AdminService {
                 },
                 orderBy: { createdAt: "desc" },
                 skip,
-                take: limit,
+                take: normalizedLimit,
             }),
             this.prisma.stakePosition.count({ where }),
         ]);
@@ -241,9 +272,13 @@ export class AdminService {
         return {
             positions,
             total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
+            page: normalizedPage,
+            limit: normalizedLimit ?? positions.length,
+            totalPages: normalizedLimit
+                ? Math.ceil(total / normalizedLimit)
+                : total > 0
+                  ? 1
+                  : 0,
         };
     }
 

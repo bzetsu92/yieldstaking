@@ -81,7 +81,7 @@ function PackagesTable({ packages, stakeTokenDecimals, stakeTokenSymbol, onUpdat
             header: 'Total Staked',
             cell: ({ row }) => (
                 <span className="font-mono">
-                    {formatAmount(row.original.totalStaked, 18)} {'AUR'}
+                    {formatAmount(row.original.totalStaked, stakeTokenDecimals)} {stakeTokenSymbol}
                 </span>
             ),
         },
@@ -329,7 +329,7 @@ export default function NetworkSetupPage() {
             {contracts?.map((contract) => (
                 <Card key={contract.id} onClick={() => setSelectedContract(contract)} className={selectedContract?.id === contract.id ? 'ring-2 ring-primary' : ''}>
                     <CardHeader>
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                             <div>
                                 <CardTitle className="flex items-center gap-2">
                                     {contract.chain.name}
@@ -354,9 +354,12 @@ export default function NetworkSetupPage() {
                                         <ExternalLink className="w-3 h-3" />
                                     </a>
                                 </CardDescription>
+                                <div className="mt-2 text-sm text-muted-foreground">
+                                    Stake token: {contract.stakeTokenSymbol} • Reward token: {contract.rewardTokenSymbol}
+                                </div>
                             </div>
                             <AdminWalletGuard fallback={null}>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap justify-end gap-2">
                                     <Button 
                                         variant="outline" 
                                         size="sm"
@@ -430,9 +433,9 @@ export default function NetworkSetupPage() {
                                     <Wallet className="h-5 w-5 text-blue-500" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-muted-foreground">Total Liquidity</div>
+                                    <div className="text-sm text-muted-foreground">Total Locked</div>
                                     <div className="text-xl font-bold">
-                                        {formatAmount(contract.totalLocked, 18)} {contract.stakeTokenSymbol}
+                                        {formatAmount(contract.totalLocked, contract.stakeTokenDecimals)} {contract.stakeTokenSymbol}
                                     </div>
                                 </div>
                             </div>
@@ -441,9 +444,12 @@ export default function NetworkSetupPage() {
                                     <Coins className="h-5 w-5 text-green-500" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-muted-foreground">Total Rewards</div>
+                                    <div className="text-sm text-muted-foreground">Outstanding Rewards</div>
                                     <div className="text-xl font-bold">
                                         {formatAmount(contract.totalRewardDebt, contract.rewardTokenDecimals)} {contract.rewardTokenSymbol}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Reserved for active positions
                                     </div>
                                 </div>
                             </div>
@@ -454,7 +460,7 @@ export default function NetworkSetupPage() {
                                 <div>
                                     <div className="text-sm text-muted-foreground">Min Stake</div>
                                     <div className="text-xl font-bold">
-                                        {formatAmount(contract.minStakeAmount, contract.stakeTokenDecimals)} {contract.rewardTokenSymbol}
+                                        {formatAmount(contract.minStakeAmount, contract.stakeTokenDecimals)} {contract.stakeTokenSymbol}
                                     </div>
                                 </div>
                             </div>

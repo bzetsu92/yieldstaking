@@ -170,7 +170,6 @@ export default function AdminPositionsPage() {
     
     const { data, isLoading } = useAdminPositions({ 
         page: 1, 
-        limit: 100,
         isWithdrawn: statusFilter === 'withdrawn' ? true : statusFilter === 'active' ? false : undefined,
         userId: userIdParam ? parseInt(userIdParam) : undefined,
         search: debouncedSearch || undefined,

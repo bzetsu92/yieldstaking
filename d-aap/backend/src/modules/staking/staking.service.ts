@@ -11,6 +11,20 @@ export class StakingService {
 
     constructor(private prisma: PrismaService) {}
 
+    private sumOutstandingRewards(
+        positions: Array<{ rewardTotal: string; rewardClaimed: string }>,
+    ): bigint {
+        return positions.reduce(
+            (sum, position) => {
+                const outstanding =
+                    BigInt(position.rewardTotal || "0") -
+                    BigInt(position.rewardClaimed || "0");
+                return sum + (outstanding > 0n ? outstanding : 0n);
+            },
+            BigInt(0),
+        );
+    }
+
     async getUserPrimaryWallet(userId: number) {
         return this.prisma.userWallet.findFirst({
             where: { userId, isPrimary: true },
@@ -348,26 +362,31 @@ export class StakingService {
     }
 
     async getGlobalStatistics() {
-        const [contracts, totalPositions, activePositions] = await Promise.all([
+        const [contracts, totalPositions, activePositions, rewardPositions] = await Promise.all([
             this.prisma.stakingContract.findMany({
                 select: {
                     totalLocked: true,
-                    totalRewardDebt: true,
                 },
             }),
             this.prisma.stakePosition.count(),
             this.prisma.stakePosition.count({
                 where: { isWithdrawn: false },
             }),
+            this.prisma.stakePosition.findMany({
+                where: { isWithdrawn: false },
+                select: {
+                    rewardTotal: true,
+                    rewardClaimed: true,
+                },
+            }),
         ]);
 
         let totalLocked = BigInt(0);
-        let totalRewardDebt = BigInt(0);
 
         for (const contract of contracts) {
             totalLocked += BigInt(contract.totalLocked);
-            totalRewardDebt += BigInt(contract.totalRewardDebt);
         }
+        const totalRewardDebt = this.sumOutstandingRewards(rewardPositions);
 
         const uniqueStakers = await this.prisma.stakePosition.groupBy({
             by: ["walletId"],
@@ -385,21 +404,40 @@ export class StakingService {
     }
 
     async getLeaderboard(limit: number = 10) {
-        const leaderboard = await this.prisma.stakePosition.groupBy({
-            by: ["walletId"],
+        const positions = await this.prisma.stakePosition.findMany({
             where: { isWithdrawn: false },
-            _count: {
-                id: true,
+            select: {
+                walletId: true,
+                principal: true,
             },
-            orderBy: {
-                _count: {
-                    id: "desc",
-                },
-            },
-            take: limit,
         });
 
-        const walletIds = leaderboard.map((entry) => entry.walletId);
+        const leaderboard = new Map<
+            number,
+            { walletId: number; totalStaked: bigint; activeStakes: number }
+        >();
+
+        for (const position of positions) {
+            const current = leaderboard.get(position.walletId) || {
+                walletId: position.walletId,
+                totalStaked: 0n,
+                activeStakes: 0,
+            };
+
+            current.totalStaked += BigInt(position.principal);
+            current.activeStakes += 1;
+            leaderboard.set(position.walletId, current);
+        }
+
+        const rankedEntries = [...leaderboard.values()]
+            .sort((a, b) => {
+                if (b.totalStaked > a.totalStaked) return 1;
+                if (b.totalStaked < a.totalStaked) return -1;
+                return b.activeStakes - a.activeStakes;
+            })
+            .slice(0, limit);
+
+        const walletIds = rankedEntries.map((entry) => entry.walletId);
         const wallets = await this.prisma.userWallet.findMany({
             where: { id: { in: walletIds } },
             select: {
@@ -408,44 +446,13 @@ export class StakingService {
             },
         });
 
-        const positions = await this.prisma.stakePosition.findMany({
-            where: {
-                walletId: { in: walletIds },
-                isWithdrawn: false,
-            },
-            select: {
-                walletId: true,
-                principal: true,
-            },
-        });
+        const walletMap = new Map(wallets.map((wallet) => [wallet.id, wallet.walletAddress]));
 
-        const stakedByWallet = new Map<number, bigint>();
-        for (const pos of positions) {
-            const current = stakedByWallet.get(pos.walletId) || BigInt(0);
-            stakedByWallet.set(pos.walletId, current + BigInt(pos.principal));
-        }
-
-        const walletMap = new Map(wallets.map((w) => [w.id, w.walletAddress]));
-
-        const result = leaderboard.map((entry) => ({
-            walletAddress: walletMap.get(entry.walletId) || "Unknown",
-            totalStaked: (
-                stakedByWallet.get(entry.walletId) || BigInt(0)
-            ).toString(),
-            stakesCount: entry._count.id,
-        }));
-
-        result.sort((a, b) => {
-            const aStaked = BigInt(a.totalStaked);
-            const bStaked = BigInt(b.totalStaked);
-            if (bStaked > aStaked) return 1;
-            if (bStaked < aStaked) return -1;
-            return 0;
-        });
-
-        return result.map((entry, index) => ({
+        return rankedEntries.map((entry, index) => ({
             rank: index + 1,
-            ...entry,
+            walletAddress: walletMap.get(entry.walletId) || "Unknown",
+            totalStaked: entry.totalStaked.toString(),
+            activeStakes: entry.activeStakes,
         }));
     }
 }

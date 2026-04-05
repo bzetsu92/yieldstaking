@@ -89,8 +89,8 @@ export class AdminController {
         @Query("search") search?: string,
     ) {
         return this.adminService.getPositions(
-            page || 1,
-            limit || 20,
+            page ?? 1,
+            limit,
             walletAddress,
             isWithdrawn,
             userId,

@@ -599,6 +599,20 @@ export class BlockchainEventProcessorService {
                     },
                 });
 
+                const contractTotals = await tx.stakingContract.findUnique({
+                    where: { id: contract.id },
+                    select: { totalRewardDebt: true },
+                });
+                await tx.stakingContract.update({
+                    where: { id: contract.id },
+                    data: {
+                        totalRewardDebt: this.subAmountString(
+                            contractTotals?.totalRewardDebt,
+                            data.amount.toString(),
+                        ),
+                    },
+                });
+
                 // Update user statistics
                 await this.updateUserStatisticsInTx(
                     tx,
@@ -713,7 +727,7 @@ export class BlockchainEventProcessorService {
 
                 const contractTotals = await tx.stakingContract.findUnique({
                     where: { id: contract.id },
-                    select: { totalLocked: true },
+                    select: { totalLocked: true, totalRewardDebt: true },
                 });
                 await tx.stakingContract.update({
                     where: { id: contract.id },
@@ -721,6 +735,10 @@ export class BlockchainEventProcessorService {
                         totalLocked: this.subAmountString(
                             contractTotals?.totalLocked,
                             data.principal.toString(),
+                        ),
+                        totalRewardDebt: this.subAmountString(
+                            contractTotals?.totalRewardDebt,
+                            data.reward.toString(),
                         ),
                     },
                 });
@@ -797,6 +815,10 @@ export class BlockchainEventProcessorService {
                         isWithdrawn: true,
                         isEmergencyWithdrawn: true,
                         withdrawTxHash: txHash,
+                        rewardClaimed: this.subAmountString(
+                            stakePosition.rewardTotal,
+                            data.rewardForfeited.toString(),
+                        ),
                     },
                 });
 
@@ -842,6 +864,10 @@ export class BlockchainEventProcessorService {
                     where: { id: contract.id },
                     select: { totalLocked: true, totalRewardDebt: true },
                 });
+                const outstandingReward = this.subAmountString(
+                    stakePosition.rewardTotal,
+                    stakePosition.rewardClaimed,
+                );
                 await tx.stakingContract.update({
                     where: { id: contract.id },
                     data: {
@@ -851,7 +877,7 @@ export class BlockchainEventProcessorService {
                         ),
                         totalRewardDebt: this.subAmountString(
                             contractTotals?.totalRewardDebt,
-                            data.rewardForfeited.toString(),
+                            outstandingReward,
                         ),
                     },
                 });

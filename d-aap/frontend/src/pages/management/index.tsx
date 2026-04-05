@@ -73,14 +73,14 @@ export default function AdminDashboardPage() {
                 <Card className="relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500/20 to-transparent rounded-bl-full" />
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Rewards</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Outstanding Rewards</CardTitle>
                         <div className="p-2 rounded-lg bg-green-500/10">
                             <Coins className="h-4 w-4 text-green-500" />
                         </div>
                     </CardHeader>
                     <CardContent>
                         <div className="text-3xl font-bold">{formatCompact(Number(formatAmount(stats?.staking.totalRewardDebt ?? '0', 6)))}</div>
-                        <p className="text-xs text-muted-foreground mt-1">USDT distributed as rewards</p>
+                        <p className="text-xs text-muted-foreground mt-1">USDT reserved for unpaid rewards</p>
                     </CardContent>
                 </Card>
 

@@ -81,12 +81,16 @@ const adminNavItems = [
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-    const { data: profile } = useAuthProfile();
+    const { data: profile, isLoading: isProfileLoading } = useAuthProfile();
     const isAdmin = profile?.role === 'ADMIN';
 
     const navItems = React.useMemo(() => {
+        if (isProfileLoading && !profile) {
+            return [];
+        }
+
         return isAdmin ? adminNavItems : userNavItems;
-    }, [isAdmin]);
+    }, [isAdmin, isProfileLoading, profile]);
 
     return (
         <Sidebar collapsible="icon" {...props}>

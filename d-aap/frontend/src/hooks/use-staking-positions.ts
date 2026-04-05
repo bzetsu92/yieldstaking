@@ -48,9 +48,16 @@ function formatDate(dateValue?: string | null): string {
 
 function formatLockPeriod(seconds: number): string {
     const days = seconds / 86400;
-    if (days >= 365) return `${Math.floor(days / 365)} Year`;
-    if (days >= 30) return `${Math.floor(days / 30)} Months`;
-    return `${Math.floor(days)} Days`;
+    if (days >= 365) {
+        const years = Math.floor(days / 365);
+        return `${years} ${years === 1 ? 'Year' : 'Years'}`;
+    }
+    if (days >= 30) {
+        const months = Math.floor(days / 30);
+        return `${months} ${months === 1 ? 'Month' : 'Months'}`;
+    }
+    const wholeDays = Math.floor(days);
+    return `${wholeDays} ${wholeDays === 1 ? 'Day' : 'Days'}`;
 }
 
 function formatTimeRemaining(unlockTimestampMs: number): string {
@@ -73,7 +80,6 @@ export function useStakingPositionsView(
     params: { page?: number; limit?: number } = { page: 1, limit: 200 },
 ) {
     const query = useMyPositions(params);
-    console.log('useStakingPositionsView', query);
     const positions = useMemo<StakingPositionView[]>(() => {
         return (query.data?.positions ?? []).map((position) => {
             const stakeTokenDecimals = position.contract?.stakeTokenDecimals ?? DEFAULT_STAKE_DECIMALS;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { Loader2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,9 +15,16 @@ import { useLeaderboard } from '@/hooks/use-staking';
 
 function formatLockPeriod(seconds: bigint): string {
     const days = Number(seconds) / 86400;
-    if (days >= 365) return `${Math.floor(days / 365)} Year`;
-    if (days >= 30) return `${Math.floor(days / 30)} Months`;
-    return `${Math.floor(days)} Days`;
+    if (days >= 365) {
+        const years = Math.floor(days / 365);
+        return `${years} ${years === 1 ? 'Year' : 'Years'}`;
+    }
+    if (days >= 30) {
+        const months = Math.floor(days / 30);
+        return `${months} ${months === 1 ? 'Month' : 'Months'}`;
+    }
+    const wholeDays = Math.floor(days);
+    return `${wholeDays} ${wholeDays === 1 ? 'Day' : 'Days'}`;
 }
 
 export default function StakePage() {
@@ -28,19 +35,6 @@ export default function StakePage() {
     const [amount, setAmount] = useState('');
     const [selectedPackage, setSelectedPackage] = useState(defaultPackage);
     const [step, setStep] = useState<'input' | 'approve' | 'stake'>('input');
-    const [countdown, setCountdown] = useState({ days: 7, hours: 15, minutes: 37, seconds: 42 });
-
-    const { data: leaderboardData } = useLeaderboard(20);
-
-    const leaderboardItems = useMemo(() => {
-        if (!leaderboardData) return [];
-        return leaderboardData.map((item) => ({
-            rank: item.rank,
-            address: `${item.walletAddress.slice(0, 6)}...${item.walletAddress.slice(-4)}`,
-            staked: Number(item.totalStaked) / 1e18,
-            rewards: (Number(item.totalStaked) / 1e18) * 0.017,
-        }));
-    }, [leaderboardData]);
 
     const {
         isTokenReady,
@@ -50,6 +44,7 @@ export default function StakePage() {
         tokenAllowance,
         tokenDecimals,
         tokenSymbol,
+        rewardSymbol,
         minStakeAmount,
         maxStakePerUser,
         userTotalStakesRaw,
@@ -63,24 +58,23 @@ export default function StakePage() {
         reset,
         refetchAll,
     } = useYieldStaking();
+    const { data: leaderboardData } = useLeaderboard(20);
+
+    const leaderboardItems = useMemo(() => {
+        if (!leaderboardData) return [];
+        return leaderboardData.map((item) => ({
+            rank: item.rank,
+            address: `${item.walletAddress.slice(0, 6)}...${item.walletAddress.slice(-4)}`,
+            fullAddress: item.walletAddress,
+            staked: Number(formatUnits(BigInt(item.totalStaked), tokenDecimals)).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }),
+            activeStakes: item.activeStakes,
+        }));
+    }, [leaderboardData, tokenDecimals]);
 
     const displayPackages = packages;
-
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setCountdown(prev => {
-                let { days, hours, minutes, seconds } = prev;
-                seconds--;
-                if (seconds < 0) { seconds = 59; minutes--; }
-                if (minutes < 0) { minutes = 59; hours--; }
-                if (hours < 0) { hours = 23; days--; }
-                if (days < 0) { days = 0; hours = 0; minutes = 0; seconds = 0; }
-                return { days, hours, minutes, seconds };
-            });
-        }, 1000);
-        return () => clearInterval(timer);
-    }, []);
-
     const selectedPkg = useMemo(() => {
         if (!displayPackages.length) return null;
         return displayPackages.find((p) => p.id === selectedPackage) || displayPackages[0];
@@ -101,12 +95,34 @@ export default function StakePage() {
     );
 
     const estimatedReward = useMemo(() => {
-        if (!amount || !selectedPkg) return '0';
+        if (!amount || !selectedPkg) return '0.00';
         const principal = parseFloat(amount);
         const apy = selectedPkg.apy / 100;
         const lockDays = Number(selectedPkg.lockPeriod) / 86400;
         return (principal * apy * (lockDays / 365)).toFixed(2);
     }, [amount, selectedPkg]);
+
+    const principalDisplay = useMemo(() => {
+        const principal = parseFloat(amount);
+        if (!amount || !Number.isFinite(principal) || principal <= 0) {
+            return '0';
+        }
+
+        return principal.toLocaleString(undefined, {
+            maximumFractionDigits: 4,
+        });
+    }, [amount]);
+
+    const availableBalanceDisplay = useMemo(() => {
+        const balance = parseFloat(tokenBalance);
+        if (!Number.isFinite(balance)) {
+            return '0';
+        }
+
+        return balance.toLocaleString(undefined, {
+            maximumFractionDigits: 4,
+        });
+    }, [tokenBalance]);
 
     const stakeError = useMemo<string | null>(() => {
         if (!isTokenReady || !amount || parseFloat(amount) <= 0) return null;
@@ -156,6 +172,7 @@ export default function StakePage() {
             await approve();
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Approval failed');
+            reset();
             setStep('input');
         }
     };
@@ -167,6 +184,7 @@ export default function StakePage() {
             await stake(amount, selectedPkg.id);
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Stake failed');
+            reset();
             setStep('input');
         }
     };
@@ -202,59 +220,77 @@ export default function StakePage() {
 
     return (
         <div className="flex flex-1 flex-col py-6 px-4 lg:px-6">
-            <div className="grid gap-6 lg:grid-cols-10">
-                <div className="lg:col-span-6 space-y-6">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
+                <div className="order-2 space-y-6 xl:order-1">
                     <Card className="bg-gradient-to-br from-slate-900 to-slate-800 border-slate-700">
                         <CardContent className="p-6">
-                            <div className="flex items-start justify-between gap-4 mb-4">
+                            <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-2">
                                         <h2 className="text-lg font-bold text-white">Aureus Staking Program - Earn Up to 50% APY</h2>
-                                        <Badge className="bg-green-500 text-white">Active</Badge>
+                                        <Badge className={isPaused ? 'bg-amber-500 text-white' : 'bg-green-500 text-white'}>
+                                            {isPaused ? 'Paused' : 'Active'}
+                                        </Badge>
                                     </div>
                                     <p className="text-sm text-slate-300 mb-3">
-                                        The <span className="font-semibold text-white">Aureus Staking Program</span> introduces a rewarding opportunity for AUR holders.
-                                        Stake your tokens and earn competitive yields based on your lock period.
+                                        Stake <span className="font-semibold text-white">{tokenSymbol}</span> and accrue
+                                        rewards in <span className="font-semibold text-white">{rewardSymbol}</span> based
+                                        on your selected lock period.
                                     </p>
                                     <p className="text-sm text-slate-400">
-                                        Current staking rewards are available through the end of Q1. <Link to="/app/stake" className="text-primary hover:underline">Check details here</Link>.
+                                        Package availability follows the live staking contract configuration.
                                     </p>
                                 </div>
-                                <div className="text-right bg-slate-800/50 rounded-lg p-4 min-w-[140px]">
-                                    <div className="text-xs text-slate-400 flex items-center justify-center gap-1 mb-1">
-                                        Total Liquidity
+                                <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[260px] xl:grid-cols-1">
+                                    <div className="rounded-lg bg-slate-800/50 p-4 text-right">
+                                        <div className="text-xs text-slate-400">Total Locked</div>
+                                        <div className="text-2xl font-bold text-white">
+                                            {parseFloat(totalLocked).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                        </div>
+                                        <div className="text-xs text-slate-400">{tokenSymbol}</div>
                                     </div>
-                                    <div className="text-2xl font-bold text-white">
-                                        {parseFloat(totalLocked).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                    <div className="rounded-lg bg-slate-800/50 p-4 text-right">
+                                        <div className="text-xs text-slate-400">Reward Token</div>
+                                        <div className="text-xl font-bold text-white">{rewardSymbol}</div>
+                                        <div className="text-xs text-slate-400">Claimed separately from principal</div>
                                     </div>
-                                    <div className="text-xs text-slate-400">{tokenSymbol}</div>
+                                    <div className="rounded-lg bg-slate-800/50 p-4 text-right">
+                                        <div className="text-xs text-slate-400">Claim Policy</div>
+                                        <div className="text-xl font-bold text-white">Anytime</div>
+                                        <div className="text-xs text-slate-400">Rewards accrue linearly after staking</div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between">
-                                <div className="inline-flex items-center gap-2 bg-slate-800 rounded-full px-4 py-2">
+                            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="inline-flex items-center gap-2 self-start rounded-full bg-slate-800 px-4 py-2">
                                     <Clock className="h-4 w-4 text-slate-400" />
-                                    <span className="text-sm text-slate-300">Season 1 Countdown:</span>
-                                    <span className="text-sm font-bold text-white">
-                                        {countdown.days}d {countdown.hours}h {countdown.minutes}m {countdown.seconds}s
+                                    <span className="text-sm text-slate-300">Staking Status:</span>
+                                    <span className={`text-sm font-bold ${isPaused ? 'text-amber-300' : 'text-emerald-300'}`}>
+                                        {isPaused ? 'Paused on contract' : 'Active on contract'}
                                     </span>
                                 </div>
-                                <div className="text-xs text-slate-400">
-                                    POWERED BY <span className="font-bold text-white">AUREUS</span>
+                                <div className="max-w-[320px] text-xs text-slate-400 sm:text-right">
+                                    Rewards start accruing from stake time and remain claimable throughout the lock period.
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
                     <div>
-                        <div className="mb-4 flex items-center justify-between">
-                            <h3 className="font-bold">PNL Leaderboard</h3>
+                        <div className="mb-4 flex items-end justify-between gap-3">
+                            <div>
+                                <h3 className="font-bold">Top Active Wallets</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Ranked by currently staked balance, not by estimated rewards.
+                                </p>
+                            </div>
                         </div>
-                        <LeaderboardTable data={leaderboardItems} />
+                        <LeaderboardTable data={leaderboardItems} stakeSymbol={tokenSymbol} />
                     </div>
                 </div>
 
-                <div className="lg:col-span-4 space-y-6">
+                <div className="order-1 space-y-6 xl:order-2 xl:sticky xl:top-6 xl:self-start">
                     <Card>
                         <CardContent className="p-4 space-y-4">
                             {!packagesReady && (
@@ -263,6 +299,22 @@ export default function StakePage() {
                                     cannot load data from the staking contract on the current network.
                                 </div>
                             )}
+                            {isPaused && (
+                                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-300">
+                                    Staking is currently paused on the contract. You can still review package details, but new deposits are blocked until the admin unpauses the contract.
+                                </div>
+                            )}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="font-medium">Stake Amount</span>
+                                    <span className="text-muted-foreground">
+                                        Available: {availableBalanceDisplay} {tokenSymbol}
+                                    </span>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    Enter the amount of {tokenSymbol} you want to lock.
+                                </div>
+                            </div>
                             <div className="relative">
                                 <input
                                     type="text"
@@ -294,24 +346,34 @@ export default function StakePage() {
 
                             <div className="space-y-2">
                                 <span className="text-sm text-muted-foreground">Lock period</span>
-                                <div className="flex gap-2">
+                                <div className="grid gap-2 sm:grid-cols-2">
                                     {displayPackages.map((pkg) => (
                                         <button
                                             key={pkg.id}
                                             onClick={() => setSelectedPackage(pkg.id)}
-                                            className={`flex-1 px-2 py-2 rounded-lg border text-center transition-all text-xs ${
+                                            className={`rounded-lg border px-3 py-3 text-left transition-all ${
                                                 selectedPackage === pkg.id
-                                                    ? 'border-primary bg-primary/10 text-primary font-semibold'
-                                                    : 'border-border hover:border-primary/50 bg-muted/20 text-muted-foreground'
+                                                    ? 'border-primary bg-primary/10 text-primary'
+                                                    : 'border-border bg-muted/20 text-muted-foreground hover:border-primary/50'
                                             }`}
                                         >
-                                            {formatLockPeriod(pkg.lockPeriod)}
+                                            <div className="text-sm font-semibold">{formatLockPeriod(pkg.lockPeriod)}</div>
+                                            <div className="text-xs opacity-80">{pkg.apy}% APY</div>
                                         </button>
                                     ))}
                                 </div>
                                 {selectedPkg && (
-                                    <div className="text-xs text-green-500 font-medium">
-                                        APY: {selectedPkg.apy}%
+                                    <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span className="text-muted-foreground">Selected package</span>
+                                            <span className="font-medium">{formatLockPeriod(selectedPkg.lockPeriod)}</span>
+                                        </div>
+                                        <div className="mt-2 flex items-center justify-between gap-3">
+                                            <span className="text-muted-foreground">Estimated reward</span>
+                                            <span className="font-medium text-green-600 dark:text-green-400">
+                                                {estimatedReward} {rewardSymbol}
+                                            </span>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -339,29 +401,24 @@ export default function StakePage() {
                                 </div>
                             )}
 
-                            <div className="space-y-3 pt-2">
+                            <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
                                 <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">You will receive</span>
+                                    <span className="text-muted-foreground">Principal at unlock</span>
                                     <span className="font-medium">
-                                        {amount && parseFloat(amount) > 0
-                                            ? (parseFloat(amount) + parseFloat(estimatedReward)).toFixed(2)
-                                            : '0.0'} {tokenSymbol}
+                                        {principalDisplay} {tokenSymbol}
                                     </span>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Exchange rate</span>
-                                    <span className="font-medium">1 {tokenSymbol} = 1 {tokenSymbol}</span>
+                                    <span className="text-muted-foreground">Estimated reward</span>
+                                    <span className="font-medium">{estimatedReward} {rewardSymbol}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Max transaction cost</span>
-                                    <span className="font-medium">~$0.02</span>
+                                    <span className="text-muted-foreground">Reward token</span>
+                                    <span className="font-medium">{rewardSymbol}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground flex items-center gap-1">
-                                        Reward fee
-                                        <span className="text-xs text-muted-foreground/70 cursor-help" title="Fee deducted from rewards">(?)</span>
-                                    </span>
-                                    <span className="font-medium">10%</span>
+                                    <span className="text-muted-foreground">Claim schedule</span>
+                                    <span className="font-medium">Accrues immediately, claim anytime</span>
                                 </div>
                             </div>
                         </CardContent>

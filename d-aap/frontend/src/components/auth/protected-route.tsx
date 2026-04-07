@@ -1,4 +1,5 @@
-import { Navigate } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAuthentication } from '@/hooks/use-authentication';
@@ -14,6 +15,29 @@ type ProtectedRouteProps = {
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
     const { isAuthenticated, isLoading } = useAuthentication();
     const { data: profile, isLoading: profileLoading } = useAuthProfile();
+    const location = useLocation();
+    const lastDeniedPathRef = useRef<string | null>(null);
+    const userRole = profile?.role?.toUpperCase() as UserRole | undefined;
+    const hasRoleAccess =
+        !requiredRole ||
+        userRole === 'ADMIN' ||
+        (requiredRole === 'USER' && userRole === 'USER');
+
+    useEffect(() => {
+        if (!requiredRole || profileLoading || hasRoleAccess) {
+            return;
+        }
+
+        if (lastDeniedPathRef.current === location.pathname) {
+            return;
+        }
+
+        lastDeniedPathRef.current = location.pathname;
+        toast.error('Access Denied', {
+            description: 'You do not have permission to access this page.',
+        });
+    }, [hasRoleAccess, location.pathname, profileLoading, requiredRole]);
+
     if (isLoading) {
         return (
             <div className="flex h-screen items-center justify-center">
@@ -35,14 +59,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     }
 
     if (requiredRole) {
-        const userRole = profile?.role?.toUpperCase() as UserRole | undefined;
-        
-        const hasAccess = userRole === 'ADMIN' || (requiredRole === 'USER' && userRole === 'USER');
-        
-        if (!hasAccess) {
-            toast.error('Access Denied', {
-                description: 'You do not have permission to access this page.',
-            });
+        if (!hasRoleAccess) {
             return <Navigate to="/app/stake" replace />;
         }
     }

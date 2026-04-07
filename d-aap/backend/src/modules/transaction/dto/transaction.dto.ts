@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { TransactionType, TransactionStatus } from "@prisma/client";
 import { Type } from "class-transformer";
-import { IsOptional, IsEnum, IsInt, Min } from "class-validator";
+import { IsEnum, IsEthereumAddress, IsInt, IsOptional, Min } from "class-validator";
 
 export class GetTransactionsDto {
     @ApiPropertyOptional({ description: "Page number", default: 1 })
@@ -36,6 +36,7 @@ export class GetTransactionsDto {
 
     @ApiPropertyOptional({ description: "Filter by wallet address" })
     @IsOptional()
+    @IsEthereumAddress()
     walletAddress?: string;
 }
 

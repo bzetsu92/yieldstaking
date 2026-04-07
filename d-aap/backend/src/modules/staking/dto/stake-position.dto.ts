@@ -1,6 +1,28 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { Type } from "class-transformer";
-import { IsOptional, IsInt, Min } from "class-validator";
+import { Transform, Type } from "class-transformer";
+import { IsBoolean, IsEthereumAddress, IsInt, IsOptional, Min } from "class-validator";
+
+function transformBoolean({ value }: { value: unknown }) {
+    if (value === undefined || value === null || value === "") {
+        return undefined;
+    }
+
+    if (typeof value === "boolean") {
+        return value;
+    }
+
+    if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === "true") {
+            return true;
+        }
+        if (normalized === "false") {
+            return false;
+        }
+    }
+
+    return value;
+}
 
 export class GetStakePositionsDto {
     @ApiPropertyOptional({ description: "Page number", default: 1 })
@@ -19,6 +41,8 @@ export class GetStakePositionsDto {
 
     @ApiPropertyOptional({ description: "Filter by withdrawn status" })
     @IsOptional()
+    @Transform(transformBoolean)
+    @IsBoolean()
     isWithdrawn?: boolean;
 
     @ApiPropertyOptional({ description: "Filter by package ID" })
@@ -29,6 +53,7 @@ export class GetStakePositionsDto {
 
     @ApiPropertyOptional({ description: "Filter by wallet address" })
     @IsOptional()
+    @IsEthereumAddress()
     walletAddress?: string;
 }
 

@@ -1,4 +1,5 @@
 import {
+    IsEthereumAddress,
     IsEmail,
     IsNotEmpty,
     IsOptional,
@@ -19,14 +20,14 @@ export class RefreshTokenDto {
 }
 
 export class MetaMaskNonceDto {
-    @IsString()
     @IsOptional()
+    @IsEthereumAddress()
     walletAddress?: string;
 }
 
 export class MetaMaskSignInDto {
-    @IsString()
     @IsNotEmpty()
+    @IsEthereumAddress()
     walletAddress: string;
 
     @IsString()

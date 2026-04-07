@@ -68,6 +68,35 @@ export class UserService {
         return user;
     }
 
+    async getAuthPrincipal(userId: number) {
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, deletedAt: null },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                role: true,
+                status: true,
+                wallets: {
+                    where: { isPrimary: true },
+                    select: {
+                        walletAddress: true,
+                    },
+                    take: 1,
+                },
+            },
+        });
+
+        if (!user) {
+            return null;
+        }
+
+        return {
+            ...user,
+            walletAddress: user.wallets[0]?.walletAddress,
+        };
+    }
+
     async getProfile(userId: number) {
         const user = await this.prisma.user.findFirst({
             where: { id: userId, deletedAt: null },

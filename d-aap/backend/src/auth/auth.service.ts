@@ -180,15 +180,9 @@ export class AuthService {
                 secret: this.jwtConfig.secretKey,
             });
 
-            const user = await this.prisma.user.findFirst({
-                where: {
-                    id: payload.id,
-                    status: UserStatus.ACTIVE,
-                    deletedAt: null,
-                },
-            });
+            const user = await this.userService.getAuthPrincipal(payload.id);
 
-            if (!user) {
+            if (!user || user.status !== UserStatus.ACTIVE) {
                 throw new UnauthorizedException(
                     ERR_MESSAGES.AUTH.INVALID_REFRESH_TOKEN,
                 );
@@ -199,6 +193,7 @@ export class AuthService {
                 email: user.email,
                 name: user.name,
                 role: user.role,
+                walletAddress: user.walletAddress,
             };
 
             const accessToken = this.jwtService.sign(newPayload, {
@@ -216,6 +211,22 @@ export class AuthService {
         } catch (error) {
             throw new UnauthorizedException("Invalid refresh token");
         }
+    }
+
+    async getCurrentUserProfile(userId: number): Promise<UserPrincipal> {
+        const user = await this.userService.getAuthPrincipal(userId);
+
+        if (!user || user.status !== UserStatus.ACTIVE) {
+            throw new UnauthorizedException(ERR_MESSAGES.AUTH.UNAUTHORIZED);
+        }
+
+        return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            walletAddress: user.walletAddress,
+        };
     }
 
     async logout(_userId: number, _refreshToken: string): Promise<void> {

@@ -5,9 +5,73 @@ export interface AppError extends Error {
     code?: string | number;
     statusCode?: number;
     context?: Record<string, unknown>;
+    details?: unknown;
 }
 
+type ApiErrorResponse = {
+    message?: string;
+    details?: unknown;
+    error?: {
+        message?: string;
+        details?: unknown;
+        code?: string | number;
+    };
+    response?: {
+        status?: number;
+        data?: {
+            message?: string;
+            details?: unknown;
+            error?: {
+                message?: string;
+                details?: unknown;
+                code?: string | number;
+            };
+        };
+    };
+    code?: string | number;
+};
+
 export class ApiErrorHandler {
+    static extractServerError(error: unknown): { message?: string; details?: unknown; code?: string | number } {
+        if (!error || typeof error !== 'object') {
+            return {};
+        }
+
+        const apiError = error as ApiErrorResponse;
+        const responseData = apiError.response?.data;
+        const serverCode = responseData?.error?.code ?? apiError.error?.code ?? apiError.code;
+        const details = responseData?.error?.details ?? responseData?.details ?? apiError.error?.details ?? apiError.details;
+        const baseMessage =
+            responseData?.error?.message ??
+            responseData?.message ??
+            apiError.error?.message ??
+            apiError.message;
+
+        if (typeof baseMessage !== 'string' || !baseMessage.trim()) {
+            return { details, code: serverCode };
+        }
+
+        if (baseMessage === 'Validation failed' && details && typeof details === 'object') {
+            const detailEntries = Object.entries(details as Record<string, unknown>)
+                .map(([field, detail]) => `${field}: ${String(detail)}`)
+                .filter(Boolean);
+
+            if (detailEntries.length > 0) {
+                return {
+                    message: `${baseMessage}: ${detailEntries.join('; ')}`,
+                    details,
+                    code: serverCode,
+                };
+            }
+        }
+
+        return {
+            message: baseMessage,
+            details,
+            code: serverCode,
+        };
+    }
+
     static isNetworkError(error: unknown): boolean {
         if (error instanceof Error) {
             return (
@@ -21,6 +85,15 @@ export class ApiErrorHandler {
 
     static handle(error: unknown, context?: string): AppError {
         const appError: AppError = error instanceof Error ? error : new Error(String(error));
+        const serverError = this.extractServerError(error);
+
+        if (serverError.message) {
+            appError.message = serverError.message;
+        }
+
+        if (serverError.details !== undefined) {
+            appError.details = serverError.details;
+        }
 
         if (error && typeof error === 'object') {
             const errorWithHttpContext = error as {
@@ -30,8 +103,8 @@ export class ApiErrorHandler {
                 };
             };
 
-            if (appError.code === undefined && errorWithHttpContext.code !== undefined) {
-                appError.code = errorWithHttpContext.code;
+            if (appError.code === undefined) {
+                appError.code = serverError.code ?? errorWithHttpContext.code;
             }
 
             if (
@@ -76,6 +149,11 @@ export class ApiErrorHandler {
             return 'Network error. Please check your connection';
         }
 
+        const serverError = this.extractServerError(error);
+        if (serverError.message) {
+            return serverError.message;
+        }
+
         if (error instanceof Error) {
             return error.message || fallback;
         }
@@ -101,7 +179,7 @@ export function handleApiError(options: HandleApiErrorOptions): Error {
     const { error, context, showToast = true } = options;
 
     const appError = ApiErrorHandler.handle(error, context);
-    const errorMessage = ApiErrorHandler.getErrorMessage(error, context);
+    const errorMessage = ApiErrorHandler.getErrorMessage(appError, context);
 
     if (showToast && !ApiErrorHandler.isNetworkError(error)) {
         toast.error(errorMessage);

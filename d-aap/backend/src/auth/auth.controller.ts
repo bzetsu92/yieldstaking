@@ -61,7 +61,6 @@ export class AuthController {
         return this.authService.login(req.user);
     }
 
-    @UseGuards(JwtAuthGuard)
     @Post("refresh")
     async refresh(@Body() refreshDto: RefreshTokenDto) {
         return this.authService.refreshToken(refreshDto.refreshToken);
@@ -90,7 +89,7 @@ export class AuthController {
     @UseGuards(JwtAuthGuard)
     @Get("profile")
     getProfile(@Request() req: AuthenticatedRequest) {
-        return req.user;
+        return this.authService.getCurrentUserProfile(req.user.id);
     }
 
     @Get("google")

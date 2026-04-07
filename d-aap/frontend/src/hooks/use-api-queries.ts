@@ -127,10 +127,13 @@ export function useResetPassword() {
 }
 
 export function useUserProfile() {
+    const { isAuthenticated } = useAuthentication();
+
     return useQuery({
         queryKey: ['user', 'profile'],
         queryFn: fetchUserProfileWithStats,
         staleTime: 5 * 60 * 1000,
+        enabled: isAuthenticated,
     });
 }
 
@@ -147,41 +150,56 @@ export function useUpdateProfile() {
 }
 
 export function useUserStatistics() {
+    const { isAuthenticated } = useAuthentication();
+
     return useQuery({
         queryKey: ['user', 'statistics'],
         queryFn: fetchUserStatistics,
         staleTime: 5 * 60 * 1000,
+        enabled: isAuthenticated,
     });
 }
 
 export function useTransactions(params?: { page?: number; limit?: number; walletAddress?: string }) {
+    const { isAuthenticated } = useAuthentication();
+
     return useQuery({
         queryKey: ['transactions', params],
         queryFn: () => fetchTransactions(params),
         staleTime: 2 * 60 * 1000,
+        enabled: isAuthenticated,
     });
 }
 
 export function useTransactionSummary(walletAddress?: string) {
+    const { isAuthenticated } = useAuthentication();
+
     return useQuery({
         queryKey: ['transactions', 'summary', walletAddress],
         queryFn: () => fetchTransactionSummary(walletAddress),
         staleTime: 2 * 60 * 1000,
+        enabled: isAuthenticated,
     });
 }
 
 export function useRewardHistory(params?: { page?: number; limit?: number; walletAddress?: string }) {
+    const { isAuthenticated } = useAuthentication();
+
     return useQuery({
         queryKey: ['rewards', 'history', params],
         queryFn: () => fetchRewardHistory(params),
         staleTime: 2 * 60 * 1000,
+        enabled: isAuthenticated,
     });
 }
 
 export function useRewardSummary(walletAddress?: string) {
+    const { isAuthenticated } = useAuthentication();
+
     return useQuery({
         queryKey: ['rewards', 'summary', walletAddress],
         queryFn: () => fetchRewardSummary(walletAddress),
         staleTime: 2 * 60 * 1000,
+        enabled: isAuthenticated,
     });
 }

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { CompletedStakesTable, type CompletedStakeItem } from '@/components/tables';
+import { Button } from '@/components/ui/button';
 import { useStakingPositionsView } from '@/hooks';
 import { DEFAULT_CHAIN_ID } from '@/lib/config/chains';
 import { EXPLORER_ENDPOINTS } from '@/lib/constants/rpc';
@@ -49,10 +50,12 @@ export default function StakeHistoryPage() {
     const chainId = useChainId() || DEFAULT_CHAIN_ID;
     const isAuthenticated = hasAccountAuth();
 
-    const { positions, isLoading, isError, metadata } = useStakingPositionsView({
+    const { positions, isLoading, isError, metadata, error, refetch } = useStakingPositionsView({
         page: 1,
         limit: 200,
     });
+    const errorMessage =
+        error instanceof Error ? error.message : 'Unable to load stake history right now.';
 
     const tableData: CompletedStakeItem[] = useMemo(
         () =>
@@ -157,7 +160,10 @@ export default function StakeHistoryPage() {
                 <div className="flex flex-1 items-center justify-center py-24">
                     <div className="rounded-2xl border border-destructive/20 bg-destructive/5 px-6 py-5 text-center">
                         <p className="text-sm font-medium text-destructive">Failed to load stake history</p>
-                        <p className="text-xs text-muted-foreground mt-1">Please refresh the page to try again.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{errorMessage}</p>
+                        <Button className="mt-4" variant="outline" onClick={() => void refetch()}>
+                            Try Again
+                        </Button>
                     </div>
                 </div>
             )}

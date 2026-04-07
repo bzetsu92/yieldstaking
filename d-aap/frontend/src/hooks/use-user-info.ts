@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { getAddress, isAddress } from 'viem';
 import { useAccount } from 'wagmi';
 
 import { formatAddressShort } from '@/lib/utils';
@@ -30,14 +31,18 @@ export function useUserInfo(): UserInfo {
 
         if (backendUser) {
             const displayName = backendUser.name || backendUser.email || 'User';
-            const walletAddress = address || backendUser.walletAddress;
+            const rawWalletAddress = address || backendUser.walletAddress;
+            const walletAddress =
+                rawWalletAddress && isAddress(rawWalletAddress)
+                    ? getAddress(rawWalletAddress)
+                    : undefined;
 
             return {
                 id: backendUser.id?.toString(),
                 name: backendUser.name || displayName,
                 displayName,
                 email: backendUser.email || '',
-                avatar: backendUser.avatar || '',
+                avatar: '',
                 role: backendUser.role || 'USER',
                 walletAddress,
                 chainId,
@@ -48,6 +53,7 @@ export function useUserInfo(): UserInfo {
 
         if (isConnected && address) {
             const displayName = formatAddressShort(address, 6, 6);
+            const walletAddress = isAddress(address) ? getAddress(address) : undefined;
 
             return {
                 id: address,
@@ -56,7 +62,7 @@ export function useUserInfo(): UserInfo {
                 email: address,
                 avatar: '',
                 role: 'USER',
-                walletAddress: address,
+                walletAddress,
                 chainId,
                 authMethod: 'wallet',
                 isConnected: true,

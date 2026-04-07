@@ -22,6 +22,26 @@ export class ApiErrorHandler {
     static handle(error: unknown, context?: string): AppError {
         const appError: AppError = error instanceof Error ? error : new Error(String(error));
 
+        if (error && typeof error === 'object') {
+            const errorWithHttpContext = error as {
+                code?: string | number;
+                response?: {
+                    status?: number;
+                };
+            };
+
+            if (appError.code === undefined && errorWithHttpContext.code !== undefined) {
+                appError.code = errorWithHttpContext.code;
+            }
+
+            if (
+                appError.statusCode === undefined &&
+                typeof errorWithHttpContext.response?.status === 'number'
+            ) {
+                appError.statusCode = errorWithHttpContext.response.status;
+            }
+        }
+
         if (context) {
             appError.context = { ...appError.context, context };
         }
@@ -89,4 +109,3 @@ export function handleApiError(options: HandleApiErrorOptions): Error {
 
     return appError;
 }
-

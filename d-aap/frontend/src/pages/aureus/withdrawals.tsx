@@ -72,7 +72,14 @@ export default function WithdrawalsPage() {
     const queryClient = useQueryClient();
 
     const { claim, withdraw, isWritePending, isConfirming, isConfirmed, reset } = useStakeWriter();
-    const { activePositions, metadata } = useStakingPositionsView({ page: 1, limit: 200 });
+    const {
+        activePositions,
+        metadata,
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useStakingPositionsView({ page: 1, limit: 200 });
 
     const tableData: StakedPackageItem[] = useMemo(
         () =>
@@ -148,6 +155,8 @@ export default function WithdrawalsPage() {
     const claimableLabel = claimableDisplay.startsWith('< ')
         ? claimableDisplay
         : `+${claimableDisplay}`;
+    const positionsErrorMessage =
+        error instanceof Error ? error.message : 'Unable to load staking positions right now.';
 
     if (!isAuthenticated) {
         return (
@@ -198,36 +207,62 @@ export default function WithdrawalsPage() {
                 </div>
             )}
 
-            {/* ── Main layout ── */}
-            <div className="grid gap-6 xl:grid-cols-10">
-                {/* Left — table */}
-                <div className="min-w-0 xl:col-span-6">
-                    <StakedPackagesTable
-                        data={tableData}
-                        selectedId={selectedStake || activePositions[0]?.id || null}
-                        onSelect={setSelectedStake}
-                        explorerUrl={explorerUrl}
-                        contractAddress={metadata.contractAddress}
-                        stakeSymbol={stakeSymbol}
-                        rewardSymbol={rewardSymbol}
-                        stakeDecimals={
-                            selected?.stakeTokenDecimals ??
-                            activePositions[0]?.stakeTokenDecimals ??
-                            18
-                        }
-                        rewardDecimals={
-                            selected?.rewardTokenDecimals ??
-                            activePositions[0]?.rewardTokenDecimals ??
-                            6
-                        }
-                    />
+            {isLoading && (
+                <div className="flex items-center justify-center gap-3 rounded-2xl border bg-card py-16 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="text-sm">Loading staking positions…</span>
                 </div>
+            )}
 
-                {/* Right — action panel */}
-                <div className="min-w-0 xl:col-span-4">
-                    <div className="rounded-2xl border bg-card overflow-hidden">
-                        {selected ? (
-                            <>
+            {isError && !isLoading && (
+                <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-destructive">
+                                Failed to load staking positions
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {positionsErrorMessage}
+                            </p>
+                        </div>
+                        <Button variant="outline" onClick={() => void refetch()}>
+                            Try Again
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Main layout ── */}
+            {!isLoading && !isError && (
+                <div className="grid gap-6 xl:grid-cols-10">
+                {/* Left — table */}
+                    <div className="min-w-0 xl:col-span-6">
+                        <StakedPackagesTable
+                            data={tableData}
+                            selectedId={selectedStake || activePositions[0]?.id || null}
+                            onSelect={setSelectedStake}
+                            explorerUrl={explorerUrl}
+                            contractAddress={metadata.contractAddress}
+                            stakeSymbol={stakeSymbol}
+                            rewardSymbol={rewardSymbol}
+                            stakeDecimals={
+                                selected?.stakeTokenDecimals ??
+                                activePositions[0]?.stakeTokenDecimals ??
+                                18
+                            }
+                            rewardDecimals={
+                                selected?.rewardTokenDecimals ??
+                                activePositions[0]?.rewardTokenDecimals ??
+                                6
+                            }
+                        />
+                    </div>
+
+                    {/* Right — action panel */}
+                    <div className="min-w-0 xl:col-span-4">
+                        <div className="rounded-2xl border bg-card overflow-hidden">
+                            {selected ? (
+                                <>
                                 {/* Position header */}
                                 <div className="border-b bg-muted/20 px-5 py-4">
                                     <div className="flex items-center justify-between gap-3">
@@ -356,30 +391,31 @@ export default function WithdrawalsPage() {
                                         </p>
                                     )}
                                 </div>
-                            </>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">
-                                <div className="rounded-full bg-muted/40 p-4">
-                                    <Clock className="h-8 w-8 text-muted-foreground" />
+                                </>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">
+                                    <div className="rounded-full bg-muted/40 p-4">
+                                        <Clock className="h-8 w-8 text-muted-foreground" />
+                                    </div>
+                                    <p className="font-medium">No active stakes</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Start staking to see your positions here
+                                    </p>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="mt-2 gap-1"
+                                        onClick={() => window.location.href = '/app/stake'}
+                                    >
+                                        Go to Stake
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
                                 </div>
-                                <p className="font-medium">No active stakes</p>
-                                <p className="text-sm text-muted-foreground">
-                                    Start staking to see your positions here
-                                </p>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="mt-2 gap-1"
-                                    onClick={() => window.location.href = '/app/stake'}
-                                >
-                                    Go to Stake
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }

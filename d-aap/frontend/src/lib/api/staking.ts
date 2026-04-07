@@ -1,5 +1,6 @@
 import { api } from './client';
 import { handleApiError } from '../utils/api-error-handler';
+import { normalizeWalletAddress } from '../utils/wallet-address';
 
 export interface StakingContract {
     id: number;
@@ -133,7 +134,13 @@ export async function fetchMyPositions(params?: {
     walletAddress?: string;
 }): Promise<StakePositionsResponse> {
     try {
-        return await api.get<StakePositionsResponse>('/v1/staking/positions', { params });
+        const normalizedWalletAddress = normalizeWalletAddress(params?.walletAddress);
+        const nextParams = {
+            ...params,
+            walletAddress: normalizedWalletAddress,
+        };
+
+        return await api.get<StakePositionsResponse>('/v1/staking/positions', { params: nextParams });
     } catch (error: unknown) {
         throw handleApiError({
             error,
@@ -145,7 +152,8 @@ export async function fetchMyPositions(params?: {
 
 export async function fetchMySummary(walletAddress?: string): Promise<StakingSummary> {
     try {
-        const params = walletAddress ? { walletAddress } : undefined;
+        const normalizedWalletAddress = normalizeWalletAddress(walletAddress);
+        const params = normalizedWalletAddress ? { walletAddress: normalizedWalletAddress } : undefined;
         return await api.get<StakingSummary>('/v1/staking/summary', { params });
     } catch (error: unknown) {
         throw handleApiError({

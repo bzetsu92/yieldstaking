@@ -1,5 +1,6 @@
 import { api } from './client';
 import { handleApiError } from '../utils/api-error-handler';
+import { normalizeWalletAddress } from '../utils/wallet-address';
 
 import type { StakingTransactionListResponse, TransactionSummary, RewardSummary, StakingTransaction, RewardHistoryResponse } from '@/interfaces';
 
@@ -10,7 +11,13 @@ export async function fetchTransactions(params?: {
     walletAddress?: string;
 }): Promise<StakingTransactionListResponse> {
     try {
-        return await api.get<StakingTransactionListResponse>('/v1/transactions', { params });
+        const normalizedWalletAddress = normalizeWalletAddress(params?.walletAddress);
+        const nextParams = {
+            ...params,
+            walletAddress: normalizedWalletAddress,
+        };
+
+        return await api.get<StakingTransactionListResponse>('/v1/transactions', { params: nextParams });
     } catch (error: unknown) {
         throw handleApiError({
             error,
@@ -32,7 +39,8 @@ export async function fetchTransactionByHash(txHash: string): Promise<StakingTra
 
 export async function fetchTransactionSummary(walletAddress?: string): Promise<TransactionSummary> {
     try {
-        const params = walletAddress ? { walletAddress } : undefined;
+        const normalizedWalletAddress = normalizeWalletAddress(walletAddress);
+        const params = normalizedWalletAddress ? { walletAddress: normalizedWalletAddress } : undefined;
         return await api.get<TransactionSummary>('/v1/transactions/summary', { params });
     } catch (error: unknown) {
         throw handleApiError({
@@ -48,7 +56,13 @@ export async function fetchRewardHistory(params?: {
     walletAddress?: string;
 }): Promise<RewardHistoryResponse> {
     try {
-        return await api.get<RewardHistoryResponse>('/v1/transactions/rewards', { params });
+        const normalizedWalletAddress = normalizeWalletAddress(params?.walletAddress);
+        const nextParams = {
+            ...params,
+            walletAddress: normalizedWalletAddress,
+        };
+
+        return await api.get<RewardHistoryResponse>('/v1/transactions/rewards', { params: nextParams });
     } catch (error: unknown) {
         throw handleApiError({
             error,
@@ -59,7 +73,8 @@ export async function fetchRewardHistory(params?: {
 
 export async function fetchRewardSummary(walletAddress?: string): Promise<RewardSummary> {
     try {
-        const params = walletAddress ? { walletAddress } : undefined;
+        const normalizedWalletAddress = normalizeWalletAddress(walletAddress);
+        const params = normalizedWalletAddress ? { walletAddress: normalizedWalletAddress } : undefined;
         return await api.get<RewardSummary>('/v1/transactions/rewards/summary', { params });
     } catch (error: unknown) {
         throw handleApiError({

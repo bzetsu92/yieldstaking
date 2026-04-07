@@ -238,8 +238,10 @@ export default function RewardHistoryPage() {
     const [searchParams] = useSearchParams();
     const positionId = searchParams.get('positionId');
 
-    const { data, isLoading, isError } = useRewardHistory({ page: 1, limit: 200 });
+    const { data, isLoading, isError, error, refetch } = useRewardHistory({ page: 1, limit: 200 });
     const { metadata } = useStakingPositionsView();
+    const errorMessage =
+        error instanceof Error ? error.message : 'Unable to load reward history right now.';
 
     const explorerUrl = EXPLORER_ENDPOINTS[chainId] || EXPLORER_ENDPOINTS[DEFAULT_CHAIN_ID];
 
@@ -384,7 +386,10 @@ export default function RewardHistoryPage() {
                 ) : isError ? (
                     <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
                         <p className="text-sm font-medium text-destructive">Failed to load rewards</p>
-                        <p className="text-xs text-muted-foreground">Please try refreshing the page.</p>
+                        <p className="text-xs text-muted-foreground">{errorMessage}</p>
+                        <Button className="mt-2" variant="outline" size="sm" onClick={() => void refetch()}>
+                            Try Again
+                        </Button>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">

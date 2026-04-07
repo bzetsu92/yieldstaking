@@ -1,6 +1,25 @@
 import { PRODUCTION_CONFIG } from './production';
 import { ERROR_CODES } from './wallet';
 
+type QueryErrorLike = {
+    code?: number | string;
+    statusCode?: number;
+    response?: {
+        status?: number;
+    };
+};
+
+function getHttpStatus(error: unknown): number | undefined {
+    if (!error || typeof error !== 'object') {
+        return undefined;
+    }
+
+    const queryError = error as QueryErrorLike;
+    const status = queryError.statusCode ?? queryError.response?.status;
+
+    return typeof status === 'number' ? status : undefined;
+}
+
 export const QUERY_CLIENT_CONFIG = {
     defaultOptions: {
         queries: {
@@ -10,7 +29,12 @@ export const QUERY_CLIENT_CONFIG = {
             refetchOnReconnect: true,
             refetchOnMount: true,
             retry: (failureCount: number, error: unknown) => {
-                const err = error as { code?: number | string };
+                const err = error as QueryErrorLike;
+                const status = getHttpStatus(error);
+
+                if (status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429) {
+                    return false;
+                }
 
                 if (err?.code === ERROR_CODES.USER_REJECTED) return false;
                 if (err?.code === ERROR_CODES.INTERNAL_ERROR) {

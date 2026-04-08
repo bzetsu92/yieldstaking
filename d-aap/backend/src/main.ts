@@ -103,8 +103,8 @@ async function bootstrap() {
 
     app.setGlobalPrefix("api", {
         exclude: [
-            { path: "/", method: RequestMethod.GET },
-            { path: "/health", method: RequestMethod.GET },
+            { path: "", method: RequestMethod.GET },
+            { path: "health", method: RequestMethod.GET },
         ],
     });
 
@@ -188,10 +188,10 @@ async function bootstrap() {
         new BadRequestExceptionFilter(),
     );
 
-    const port = process.env.PORT || 3000;
-    await app.listen(port);
+    const port = Number(process.env.PORT || 3000);
+    await app.listen(port, "0.0.0.0");
 
-    logger.log(`Yield Staking Backend running on: http://localhost:${port}`);
+    logger.log(`Yield Staking Backend running on: http://0.0.0.0:${port}`);
     if (process.env.NODE_ENV !== "production") {
         logger.log(`Swagger docs available at: http://localhost:${port}/docs`);
     }

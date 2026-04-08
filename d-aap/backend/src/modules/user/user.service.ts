@@ -29,12 +29,10 @@ export class UserService {
                 name: true,
                 role: true,
                 status: true,
-                wallets: {
-                    where: { isPrimary: true },
+                wallet: {
                     select: {
                         walletAddress: true,
                     },
-                    take: 1,
                 },
             },
         });
@@ -45,7 +43,7 @@ export class UserService {
 
         return {
             ...user,
-            walletAddress: user.wallets[0]?.walletAddress,
+            walletAddress: user.wallet?.walletAddress,
         };
     }
 
@@ -53,10 +51,7 @@ export class UserService {
         const user = await this.prisma.user.findFirst({
             where: { id, deletedAt: null },
             include: {
-                wallets: {
-                    where: { isPrimary: true },
-                    take: 1,
-                },
+                wallet: true,
                 statistics: true,
             },
         });
@@ -77,12 +72,10 @@ export class UserService {
                 name: true,
                 role: true,
                 status: true,
-                wallets: {
-                    where: { isPrimary: true },
+                wallet: {
                     select: {
                         walletAddress: true,
                     },
-                    take: 1,
                 },
             },
         });
@@ -93,7 +86,7 @@ export class UserService {
 
         return {
             ...user,
-            walletAddress: user.wallets[0]?.walletAddress,
+            walletAddress: user.wallet?.walletAddress,
         };
     }
 
@@ -111,9 +104,7 @@ export class UserService {
                 emailVerified: true,
                 createdAt: true,
                 updatedAt: true,
-                wallets: {
-                    where: { isPrimary: true },
-                    take: 1,
+                wallet: {
                     select: {
                         walletAddress: true,
                         chain: {
@@ -134,7 +125,7 @@ export class UserService {
 
         return {
             ...user,
-            walletAddress: user.wallets[0]?.walletAddress,
+            walletAddress: user.wallet?.walletAddress,
         };
     }
 
@@ -250,6 +241,15 @@ export class UserService {
     ) {
         const normalizedAddress = walletAddress.toLowerCase();
 
+        const walletCountForUser = await this.prisma.userWallet.count({
+            where: { userId },
+        });
+        if (walletCountForUser > 0) {
+            throw new BadRequestException(
+                ERR_MESSAGES.USER.ACCOUNT_ALREADY_HAS_WALLET,
+            );
+        }
+
         try {
             const recoveredAddress = ethers.verifyMessage(message, signature);
             if (recoveredAddress.toLowerCase() !== normalizedAddress) {
@@ -258,6 +258,12 @@ export class UserService {
                 );
             }
         } catch (error) {
+            if (
+                error instanceof BadRequestException ||
+                error instanceof UnauthorizedException
+            ) {
+                throw error;
+            }
             this.logger.error("Signature verification failed:", error);
             throw new UnauthorizedException(
                 ERR_MESSAGES.AUTH.SIGNATURE_INVALID,
@@ -269,88 +275,11 @@ export class UserService {
             include: { user: true },
         });
 
-        // Case 1: Wallet already linked to THIS user
-        if (existingWallet && existingWallet.userId === userId) {
-            return {
-                success: true,
-                message: "Wallet is already linked to your account",
-                wallet: existingWallet,
-            };
-        }
-
-        // Case 2: Wallet linked to ANOTHER user
         if (existingWallet && existingWallet.userId !== userId) {
-            const otherUser = (existingWallet as any).user;
-            
-            // If the other user is a wallet-only user, we can merge them
-            if (otherUser.authMethod === "WALLET") {
-                this.logger.log(`Merging wallet-only user ${otherUser.id} into email user ${userId}`);
-                
-                // Start a transaction to merge
-                return await this.prisma.$transaction(async (tx) => {
-                    // 1. Delete the other user's wallet record (to satisfy uniqueness)
-                    await tx.userWallet.delete({
-                        where: { id: existingWallet.id }
-                    });
-
-                    // 2. Delete any existing wallet for the current user
-                    await tx.userWallet.deleteMany({
-                        where: { userId }
-                    });
-
-                    // 3. Create the new wallet record for the current user
-                    const chain = await tx.chain.findFirst({
-                        where: { isActive: true },
-                    });
-                    
-                    if (!chain) {
-                        throw new BadRequestException(ERR_MESSAGES.AUTH.NO_ACTIVE_CHAIN);
-                    }
-
-                    const newWallet = await tx.userWallet.create({
-                        data: {
-                            userId,
-                            chainId: chain.id,
-                            walletAddress: normalizedAddress,
-                            isPrimary: true,
-                            isVerified: true,
-                            verifiedAt: new Date(),
-                        },
-                    });
-
-                    // 4. Transfer any stake positions and transactions from the old wallet to the new wallet
-                    // Note: StakePosition and Transaction refer to walletId
-                    await (tx as any).stakePosition.updateMany({
-                        where: { walletId: existingWallet.id },
-                        data: { walletId: newWallet.id }
-                    });
-
-                    await (tx as any).transaction.updateMany({
-                        where: { walletId: existingWallet.id },
-                        data: { walletId: newWallet.id }
-                    });
-
-                    // 5. Delete the now-empty other user
-                    await tx.user.delete({
-                        where: { id: otherUser.id }
-                    });
-
-                    return {
-                        success: true,
-                        message: "Wallet merged and linked successfully",
-                        wallet: newWallet,
-                    };
-                });
-            } else {
-                // If the other user has an email, we can't merge automatically
-                throw new BadRequestException(
-                    "This wallet is already linked to another email account.",
-                );
-            }
+            throw new BadRequestException(
+                "This wallet is already linked to another account.",
+            );
         }
-
-        // Case 3: Wallet not linked to anyone yet
-        const user = await this.findById(userId);
 
         const chain = await this.prisma.chain.findFirst({
             where: { isActive: true },
@@ -361,12 +290,6 @@ export class UserService {
         }
 
         return await this.prisma.$transaction(async (tx) => {
-            // Delete any existing wallet for the current user
-            await tx.userWallet.deleteMany({
-                where: { userId }
-            });
-
-            // Create the new wallet record
             const newWallet = await tx.userWallet.create({
                 data: {
                     userId,

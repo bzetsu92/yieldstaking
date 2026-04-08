@@ -32,7 +32,9 @@ export function EmailPasswordForm({
             onLoadingChange?.(true);
 
             const formData = new FormData(e.currentTarget);
-            const email = formData.get('email') as string;
+            const email = String(formData.get('email') || '')
+                .trim()
+                .toLowerCase();
             const password = formData.get('password') as string;
 
             try {

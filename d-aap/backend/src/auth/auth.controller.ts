@@ -12,6 +12,7 @@ import { Response } from "express";
 
 import { AuthService } from "./auth.service";
 import {
+    ChangePasswordDto,
     EmailRegisterDto,
     MetaMaskSignInDto,
     MetaMaskNonceDto,
@@ -74,6 +75,15 @@ export class AuthController {
     @Post("reset-password")
     async resetPassword(@Body() resetDto: ResetPasswordDto) {
         return this.authService.resetPassword(resetDto);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post("change-password")
+    async changePassword(
+        @Request() req: AuthenticatedRequest,
+        @Body() dto: ChangePasswordDto,
+    ) {
+        return this.authService.changePassword(req.user.id, dto);
     }
 
     @UseGuards(JwtAuthGuard)

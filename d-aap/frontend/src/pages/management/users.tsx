@@ -80,13 +80,13 @@ export default function AdminUsersPage() {
             ),
         },
         {
-            accessorKey: 'wallets',
+            accessorKey: 'wallet',
             header: 'Wallet',
             cell: ({ row }) => (
-                row.original.wallets.length > 0 ? (
+                row.original.wallet ? (
                     <code className="text-xs">
-                        {row.original.wallets[0].walletAddress.slice(0, 6)}...
-                        {row.original.wallets[0].walletAddress.slice(-4)}
+                        {row.original.wallet.walletAddress.slice(0, 6)}...
+                        {row.original.wallet.walletAddress.slice(-4)}
                     </code>
                 ) : (
                     <span className="text-muted-foreground">-</span>

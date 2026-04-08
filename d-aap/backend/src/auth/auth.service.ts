@@ -13,7 +13,7 @@ import { compare, hash } from "bcrypt";
 
 import { UserService } from "../modules/user/user.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { EmailRegisterDto } from "./dto/auth.dto";
+import { ChangePasswordDto, EmailRegisterDto } from "./dto/auth.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { UserPrincipal } from "./interface/user-principal.interface";
 import { ERR_MESSAGES, SUCCESS_MESSAGES } from "../constants/messages.constant";
@@ -131,30 +131,11 @@ export class AuthService {
             },
         });
 
-        const hashedPassword = await hash(registerDto.password, 12);
-
-        if (existingUser?.password) {
+        if (existingUser) {
             throw new BadRequestException(ERR_MESSAGES.AUTH.EMAIL_ALREADY_EXISTS);
         }
 
-        if (existingUser) {
-            await this.prisma.user.update({
-                where: { id: existingUser.id },
-                data: {
-                    name,
-                    password: hashedPassword,
-                    authMethod:
-                        existingUser.authMethod === "OAUTH_GOOGLE"
-                            ? "BOTH"
-                            : "EMAIL_PASSWORD",
-                    emailVerified: true,
-                    emailVerifiedAt: new Date(),
-                    status: UserStatus.ACTIVE,
-                },
-            });
-
-            return { message: SUCCESS_MESSAGES.AUTH.ACCOUNT_CREATED };
-        }
+        const hashedPassword = await hash(registerDto.password, 12);
 
         await this.prisma.user.create({
             data: {
@@ -227,6 +208,35 @@ export class AuthService {
             role: user.role,
             walletAddress: user.walletAddress,
         };
+    }
+
+    async changePassword(
+        userId: number,
+        data: ChangePasswordDto,
+    ): Promise<{ message: string }> {
+        const user = await this.userService.findUserForAuth({ id: userId });
+        if (!user || user.status !== UserStatus.ACTIVE || !user.password) {
+            throw new UnauthorizedException(ERR_MESSAGES.AUTH.UNAUTHORIZED);
+        }
+
+        const currentMatched = await compare(data.currentPassword, user.password);
+        if (!currentMatched) {
+            throw new BadRequestException("Current password is incorrect");
+        }
+
+        if (data.currentPassword === data.newPassword) {
+            throw new BadRequestException(
+                "New password must be different from current password",
+            );
+        }
+
+        const hashedPassword = await hash(data.newPassword, 12);
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { password: hashedPassword },
+        });
+
+        return { message: "Password changed successfully" };
     }
 
     async logout(_userId: number, _refreshToken: string): Promise<void> {

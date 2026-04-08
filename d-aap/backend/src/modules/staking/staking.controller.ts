@@ -88,12 +88,24 @@ export class StakingController {
         type: Number,
         description: "Number of entries (default: 10)",
     })
+    @ApiQuery({
+        name: "contractAddress",
+        required: false,
+        type: String,
+        description: "Filter leaderboard by staking contract address",
+    })
     @ApiResponse({
         status: 200,
         description: "Leaderboard retrieved successfully",
     })
-    async getLeaderboard(@Query("limit") limit?: number) {
-        return this.stakingService.getLeaderboard(limit || 10);
+    async getLeaderboard(
+        @Query("limit") limit?: number,
+        @Query("contractAddress") contractAddress?: string,
+    ) {
+        return this.stakingService.getLeaderboard(
+            limit || 10,
+            contractAddress,
+        );
     }
 
     @Get("positions")

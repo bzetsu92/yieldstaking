@@ -27,7 +27,7 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
             <DialogContent className={MODAL_CLASSES}>
                 <DialogHeader />
                 <div className={CONTENT_CLASSES}>
-                    <ChangePasswordForm />
+                    <ChangePasswordForm onSuccess={onClose} />
                 </div>
             </DialogContent>
         </Dialog>

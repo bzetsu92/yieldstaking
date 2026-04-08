@@ -403,9 +403,26 @@ export class StakingService {
         };
     }
 
-    async getLeaderboard(limit: number = 10) {
+    async getLeaderboard(limit: number = 10, contractAddress?: string) {
+        const normalizedContractAddress = contractAddress?.trim().toLowerCase();
+
+        let contractIdFilter: number | undefined;
+        if (normalizedContractAddress) {
+            const contract = await this.prisma.stakingContract.findFirst({
+                where: { address: normalizedContractAddress },
+                select: { id: true },
+            });
+            if (!contract) {
+                return [];
+            }
+            contractIdFilter = contract.id;
+        }
+
         const positions = await this.prisma.stakePosition.findMany({
-            where: { isWithdrawn: false },
+            where: {
+                isWithdrawn: false,
+                ...(contractIdFilter ? { contractId: contractIdFilter } : {}),
+            },
             select: {
                 walletId: true,
                 principal: true,

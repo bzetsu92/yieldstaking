@@ -9,10 +9,10 @@ export interface AdminUser {
     status: UserStatus;
     authMethod: string;
     createdAt: string;
-    wallets: {
+    wallet: {
         walletAddress: string;
         isPrimary: boolean;
-    }[];
+    } | null;
     _count: {
         sessions: number;
     };

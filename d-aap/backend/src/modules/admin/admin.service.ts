@@ -410,7 +410,7 @@ export class AdminService {
                     status: true,
                     authMethod: true,
                     createdAt: true,
-                    wallets: {
+                    wallet: {
                         select: {
                             walletAddress: true,
                             isPrimary: true,

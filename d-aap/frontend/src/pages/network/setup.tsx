@@ -7,8 +7,9 @@ import {
     useReactTable,
 } from '@tanstack/react-table';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
-import { ExternalLink, Pause, Play, Database, Wallet, Coins, Package, TrendingUp, Settings, Plus, ArrowDownToLine } from 'lucide-react';
+import { ExternalLink, Pause, Play, Database, Wallet, Coins, Package, TrendingUp, Settings, Plus, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { parseUnits, formatUnits } from 'viem';
+import type { Address } from 'viem';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -203,7 +204,18 @@ function PackagesTable({ packages, stakeTokenDecimals, stakeTokenSymbol, onUpdat
 
 export default function NetworkSetupPage() {
     const { data: contracts, isLoading } = useAdminContracts();
-    const { pause, unpause, setPackage, setMinStakeAmount, setMaxStakePerUser, setMaxTotalStakedPerPackage, withdrawExcessReward, isWritePending } = useAdminBlockchainActions();
+    const {
+        pause,
+        unpause,
+        setPackage,
+        setMinStakeAmount,
+        setMaxStakePerUser,
+        setMaxTotalStakedPerPackage,
+        withdrawExcessReward,
+        transferRewardToken,
+        transferStakeToken,
+        isWritePending
+    } = useAdminBlockchainActions();
     
     const [selectedContract, setSelectedContract] = React.useState<StakingContractAdmin | null>(null);
     const [isPackageDialogOpen, setIsPackageDialogOpen] = React.useState(false);
@@ -219,11 +231,14 @@ export default function NetworkSetupPage() {
 
     const [isMaxTotalDialogOpen, setIsMaxTotalDialogOpen] = React.useState(false);
     const [isWithdrawRewardDialogOpen, setIsWithdrawRewardDialogOpen] = React.useState(false);
+    const [isFundTokenDialogOpen, setIsFundTokenDialogOpen] = React.useState(false);
 
     const [minStakeValue, setMinStakeValue] = React.useState('500');
     const [maxStakeValue, setMaxStakeValue] = React.useState('0');
     const [maxTotalValue, setMaxTotalValue] = React.useState('0');
     const [withdrawRewardValue, setWithdrawRewardValue] = React.useState('');
+    const [fundTokenType, setFundTokenType] = React.useState<'reward' | 'stake'>('reward');
+    const [fundTokenValue, setFundTokenValue] = React.useState('');
 
     const handleUpdatePackage = (pkg: any) => {
         setPackageForm({
@@ -287,11 +302,33 @@ export default function NetworkSetupPage() {
         if (!selectedContract) return;
         try {
             const amount = parseUnits(withdrawRewardValue, selectedContract.rewardTokenDecimals);
-            await withdrawExcessReward(amount);
+            await withdrawExcessReward(amount, selectedContract.address as Address);
             setIsWithdrawRewardDialogOpen(false);
             toast.success('Withdraw excess reward transaction sent');
         } catch (err: any) {
             toast.error(err.message || 'Failed to withdraw excess reward');
+        }
+    };
+
+    const onFundTokenSubmit = async () => {
+        if (!selectedContract) return;
+        try {
+            const decimals =
+                fundTokenType === 'reward'
+                    ? selectedContract.rewardTokenDecimals
+                    : selectedContract.stakeTokenDecimals;
+            const amount = parseUnits(fundTokenValue, decimals);
+            if (fundTokenType === 'reward') {
+                await transferRewardToken(amount, selectedContract.address as Address);
+            } else {
+                await transferStakeToken(amount, selectedContract.address as Address);
+            }
+            setIsFundTokenDialogOpen(false);
+            toast.success(
+                `Fund ${fundTokenType === 'reward' ? selectedContract.rewardTokenSymbol : selectedContract.stakeTokenSymbol} transaction sent`,
+            );
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to fund token');
         }
     };
 
@@ -410,6 +447,20 @@ export default function NetworkSetupPage() {
                                     >
                                         <ArrowDownToLine className="w-3 h-3 mr-1" />
                                         Withdraw Reward
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedContract(contract);
+                                            setFundTokenType('reward');
+                                            setFundTokenValue('');
+                                            setIsFundTokenDialogOpen(true);
+                                        }}
+                                    >
+                                        <ArrowUpFromLine className="w-3 h-3 mr-1" />
+                                        Fund Token
                                     </Button>
                                     <Button 
                                         variant={contract.isPaused ? "default" : "destructive"}
@@ -668,6 +719,58 @@ export default function NetworkSetupPage() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsWithdrawRewardDialogOpen(false)}>Cancel</Button>
                         <Button onClick={onWithdrawRewardSubmit} disabled={isWritePending || !withdrawRewardValue}>
+                            {isWritePending ? 'Processing...' : 'Send Transaction'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Fund Token Dialog */}
+            <Dialog open={isFundTokenDialogOpen} onOpenChange={setIsFundTokenDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Fund Contract Token</DialogTitle>
+                        <DialogDescription>
+                            Deposit token from Admin wallet into selected staking contract.
+                            Please approve token spending first.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label>Token Type</Label>
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant={fundTokenType === 'reward' ? 'default' : 'outline'}
+                                    onClick={() => setFundTokenType('reward')}
+                                >
+                                    Reward ({selectedContract?.rewardTokenSymbol})
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={fundTokenType === 'stake' ? 'default' : 'outline'}
+                                    onClick={() => setFundTokenType('stake')}
+                                >
+                                    Stake ({selectedContract?.stakeTokenSymbol})
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="fundAmount">
+                                Amount ({fundTokenType === 'reward' ? selectedContract?.rewardTokenSymbol : selectedContract?.stakeTokenSymbol})
+                            </Label>
+                            <Input
+                                id="fundAmount"
+                                type="number"
+                                placeholder="0.00"
+                                value={fundTokenValue}
+                                onChange={(e) => setFundTokenValue(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsFundTokenDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={onFundTokenSubmit} disabled={isWritePending || !fundTokenValue}>
                             {isWritePending ? 'Processing...' : 'Send Transaction'}
                         </Button>
                     </DialogFooter>

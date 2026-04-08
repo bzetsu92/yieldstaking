@@ -1,20 +1,22 @@
 import { Lock, Eye, EyeOff } from 'lucide-react';
 import { useState, useCallback } from 'react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useChangePassword } from '@/hooks/use-api-queries';
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({ onSuccess }: { onSuccess?: () => void }) {
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const changePasswordMutation = useChangePassword();
 
     const handleSubmit = useCallback(
         async (e: React.FormEvent) => {
@@ -41,20 +43,26 @@ export function ChangePasswordForm() {
                 return;
             }
 
-            setIsLoading(true);
             try {
-                await new Promise((resolve) => setTimeout(resolve, 1000));
+                const result = await changePasswordMutation.mutateAsync({
+                    currentPassword,
+                    newPassword,
+                });
                 setCurrentPassword('');
                 setNewPassword('');
                 setConfirmPassword('');
                 setError('');
+                toast.success(result.message || 'Password changed successfully');
+                onSuccess?.();
             } catch (_err) {
-                setError('Failed to change password. Please try again.');
-            } finally {
-                setIsLoading(false);
+                const message =
+                    _err instanceof Error
+                        ? _err.message
+                        : 'Failed to change password. Please try again.';
+                setError(message);
             }
         },
-        [currentPassword, newPassword, confirmPassword],
+        [currentPassword, newPassword, confirmPassword, changePasswordMutation, onSuccess],
     );
 
     return (
@@ -177,8 +185,8 @@ export function ChangePasswordForm() {
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={isLoading}>
-                                {isLoading ? 'Changing...' : 'Change Password'}
+                            <Button type="submit" disabled={changePasswordMutation.isPending}>
+                                {changePasswordMutation.isPending ? 'Changing...' : 'Change Password'}
                             </Button>
                         </div>
                     </form>

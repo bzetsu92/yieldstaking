@@ -58,6 +58,8 @@ export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
     return userInfo.email.includes("@") ? userInfo.email : "";
   }, [userInfo.email, profileData]);
 
+  const hasLinkedWallet = Boolean(profileData?.user?.walletAddress);
+
   const initialProfile = useMemo(() => {
     const name = (profileData?.user?.name || userInfo.name || "").split(" ");
     return {
@@ -122,8 +124,10 @@ export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
     }
   };
 
-  // ===== WALLET =====
   const handleLink = async () => {
+    if (hasLinkedWallet) {
+      return toast.error("This account already has a linked wallet.");
+    }
     if (!isConnected || !address)
       return toast.error("Connect wallet first");
 
@@ -146,7 +150,6 @@ export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
   return (
     <div className="flex flex-col h-full bg-background">
 
-      {/* HEADER */}
       <div className="p-6 border-b flex items-center gap-4">
         <div className="relative">
           <div className="w-16 h-16 rounded-full bg-muted overflow-hidden flex items-center justify-center">
@@ -261,7 +264,9 @@ export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
             <CardHeader>
               <CardTitle>Wallet</CardTitle>
               <CardDescription>
-                Connect & link your wallet
+                {hasLinkedWallet
+                  ? "Primary wallet is linked once per account. Re-linking is not supported."
+                  : "Connect your wallet and link it once as the primary address for this account."}
               </CardDescription>
             </CardHeader>
 
@@ -293,11 +298,19 @@ export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
                   </code>
                 </div>
 
-                {!isConnected ? (
+                {hasLinkedWallet ? (
+                  <span className="text-xs text-muted-foreground text-right max-w-[160px]">
+                    Already linked
+                  </span>
+                ) : !isConnected ? (
                   <ConnectButton />
                 ) : (
-                  <Button size="sm" onClick={handleLink}>
-                    Link
+                  <Button
+                    size="sm"
+                    onClick={handleLink}
+                    disabled={linkWalletMutation.isPending}
+                  >
+                    {linkWalletMutation.isPending ? "Linking…" : "Link"}
                   </Button>
                 )}
               </div>

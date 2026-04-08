@@ -10,6 +10,7 @@ import {
     Info,
     AlertTriangle,
     ChevronRight,
+    ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { parseUnits, formatUnits } from 'viem';
@@ -48,7 +49,6 @@ function SummaryRow({ label, value, highlight }: { label: string; value: string;
     );
 }
 
-/* ── Package card ── */
 function PackageCard({
     pkg,
     selected,
@@ -126,6 +126,7 @@ export default function YieldStakingPage() {
         maxStakePerUser,
         userTotalStakesRaw,
         totalLocked,
+        stakingAddress,
         isPaused,
         approve,
         stake,
@@ -136,7 +137,10 @@ export default function YieldStakingPage() {
         refetchAll,
     } = useYieldStaking();
 
-    const { data: leaderboardData } = useLeaderboard(20);
+    const { data: leaderboardData } = useLeaderboard({
+        limit: 20,
+        contractAddress: stakingAddress,
+    });
 
     const leaderboardItems = useMemo(() => {
         if (!leaderboardData) return [];
@@ -348,6 +352,20 @@ export default function YieldStakingPage() {
                                 )}>
                                     {isPaused ? 'Paused — new deposits blocked' : 'Active — accepting deposits'}
                                 </span>
+                            </div>
+                            <div className="mt-2 flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2">
+                                <span className="text-xs text-slate-400 shrink-0">Staking contract:</span>
+                                <code className="text-xs text-slate-200 truncate max-w-[300px]">
+                                    {stakingAddress}
+                                </code>
+                                <a
+                                    href={`https://sepolia.etherscan.io/address/${stakingAddress}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-slate-300 hover:text-white transition-colors"
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
                             </div>
                         </div>
                     </div>

@@ -6,6 +6,7 @@
     "license": "MIT",
     "scripts": {
         "seed": "ts-node prisma/seed.ts",
+        "seed:staking-data": "ts-node prisma/seed-staking-data.ts",
         "seed:prod": "node dist/prisma/seed.js",
         "build": "npx tsc -p tsconfig.build.json && npx tsc-alias -p tsconfig.build.json",
         "format": "prettier --write \"src/**/*.ts\" \"prisma/schema.prisma\"",

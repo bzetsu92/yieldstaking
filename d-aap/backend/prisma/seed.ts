@@ -50,12 +50,12 @@ async function main() {
         },
     });
 
-    // Mirror the 4 packages defined in YieldStaking constructor
     const packagesData = [
-        { packageId: 0, lockPeriod: 90 * 86400,  apy: 2000 },
-        { packageId: 1, lockPeriod: 180 * 86400, apy: 2500 },
-        { packageId: 2, lockPeriod: 270 * 86400, apy: 3500 },
-        { packageId: 3, lockPeriod: 360 * 86400, apy: 5000 },
+        { packageId: 0, lockPeriod: 90 * 86400, apy: 2000, totalStaked: 0n, stakersCount: 0 },
+        { packageId: 1, lockPeriod: 180 * 86400, apy: 2500, totalStaked: 0n, stakersCount: 0 },
+        { packageId: 2, lockPeriod: 270 * 86400, apy: 3500, totalStaked: 0n, stakersCount: 0 },
+        { packageId: 3, lockPeriod: 360 * 86400, apy: 5000, totalStaked: 0n, stakersCount: 0 },
+        { packageId: 4, lockPeriod: 45 * 86400, apy: 2000, totalStaked: 0n, stakersCount: 0 },
     ];
 
     for (const pkg of packagesData) {
@@ -66,23 +66,28 @@ async function main() {
                     packageId: pkg.packageId,
                 },
             },
-            update: { lockPeriod: pkg.lockPeriod, apy: pkg.apy, isEnabled: true },
+            update: {
+                lockPeriod: pkg.lockPeriod,
+                apy: pkg.apy,
+                isEnabled: true,
+                totalStaked: pkg.totalStaked.toString(),
+                stakersCount: pkg.stakersCount,
+            },
             create: {
                 contractId: stakingContract.id,
                 packageId: pkg.packageId,
                 lockPeriod: pkg.lockPeriod,
                 apy: pkg.apy,
                 isEnabled: true,
-                totalStaked: '0',
+                totalStaked: pkg.totalStaked.toString(),
                 maxTotalStaked: '0',
-                stakersCount: 0,
+                stakersCount: pkg.stakersCount,
             },
         });
     }
 
     const hashedPassword = await bcrypt.hash('123', 12);
 
-    /** Khớp `deploy-and-fund.ts` (Admin + User1–3 đã nhận AUR) */
     const usersData = [
         {
             email: 'admin@yieldstaking.com',

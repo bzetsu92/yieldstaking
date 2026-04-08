@@ -62,10 +62,13 @@ export function useGlobalStatistics() {
     });
 }
 
-export function useLeaderboard(limit?: number) {
+export function useLeaderboard(params?: {
+    limit?: number;
+    contractAddress?: string;
+}) {
     return useQuery({
-        queryKey: ['staking', 'leaderboard', limit],
-        queryFn: () => fetchLeaderboard(limit),
+        queryKey: ['staking', 'leaderboard', params],
+        queryFn: () => fetchLeaderboard(params),
         staleTime: 60 * 1000,
     });
 }

@@ -7,8 +7,10 @@ import {
     useReactTable,
 } from '@tanstack/react-table';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
-import { RefreshCw, Play, AlertCircle, CheckCircle, Clock, Database, Activity, Inbox, Zap, Wallet, ShieldAlert, Coins } from 'lucide-react';
+import { RefreshCw, Play, AlertCircle, CheckCircle, Clock, Database, Activity, Inbox, Zap, Wallet, ShieldAlert, Coins, ArrowUpFromLine } from 'lucide-react';
 import { parseUnits } from 'viem';
+import { useChainId } from 'wagmi';
+import type { Address } from 'viem';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     useBlockchainSyncStatuses,
     useBlockchainHealth,
     useUnprocessedEventCount,
@@ -42,31 +51,66 @@ import {
 } from '@/hooks';
 import { toast } from 'sonner';
 import { AdminWalletGuard } from '@/components/auth/admin-wallet-guard';
+import { getYieldStakingAddress } from '@/lib/blockchain/contracts';
+import { DEFAULT_CHAIN_ID } from '@/lib/config/chains';
 
 import type { BlockchainSyncStatus } from '@/interfaces/admin';
 
 export default function NetworkMonitorPage() {
+    const chainId = useChainId() || DEFAULT_CHAIN_ID;
     const { data: syncStatuses, isLoading: syncLoading, refetch: refetchSync } = useBlockchainSyncStatuses();
     const { data: health, isLoading: healthLoading } = useBlockchainHealth();
     const { data: unprocessed } = useUnprocessedEventCount();
     const { data: contracts } = useAdminContracts();
     const triggerSync = useTriggerBlockchainSync();
     const processEvents = useProcessBlockchainEvents();
-    const { withdrawExcessReward, isWritePending } = useAdminBlockchainActions();
+    const { withdrawExcessReward, transferRewardToken, transferStakeToken, isWritePending } = useAdminBlockchainActions();
 
     const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = React.useState(false);
     const [withdrawAmount, setWithdrawAmount] = React.useState('100');
     const [selectedContract, setSelectedContract] = React.useState<any>(null);
+    const [isFundDialogOpen, setIsFundDialogOpen] = React.useState(false);
+    const [fundAmount, setFundAmount] = React.useState('100');
+    const [fundTokenType, setFundTokenType] = React.useState<'reward' | 'stake'>('reward');
+    const configuredContractAddress = getYieldStakingAddress(chainId).toLowerCase();
+
+    React.useEffect(() => {
+        if (!contracts?.length) return;
+        const matched =
+            contracts.find((c) => c.address.toLowerCase() === configuredContractAddress) ||
+            contracts[0];
+        setSelectedContract(matched);
+    }, [contracts, configuredContractAddress]);
 
     const onWithdrawSubmit = async () => {
         if (!selectedContract) return;
         try {
             const amount = parseUnits(withdrawAmount, selectedContract.rewardTokenDecimals);
-            await withdrawExcessReward(amount);
+            await withdrawExcessReward(amount, selectedContract.address as Address);
             setIsWithdrawDialogOpen(false);
             toast.success('Withdraw transaction sent');
         } catch (err: any) {
             toast.error(err.message || 'Failed to withdraw excess rewards');
+        }
+    };
+
+    const onFundSubmit = async () => {
+        if (!selectedContract) return;
+        try {
+            const decimals =
+                fundTokenType === 'reward'
+                    ? selectedContract.rewardTokenDecimals
+                    : selectedContract.stakeTokenDecimals;
+            const amount = parseUnits(fundAmount, decimals);
+            if (fundTokenType === 'reward') {
+                await transferRewardToken(amount, selectedContract.address as Address);
+            } else {
+                await transferStakeToken(amount, selectedContract.address as Address);
+            }
+            setIsFundDialogOpen(false);
+            toast.success('Fund transaction sent');
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to fund contract');
         }
     };
 
@@ -279,17 +323,34 @@ export default function NetworkMonitorPage() {
                             <Button
                                 variant="outline"
                                 onClick={() => {
-                                    if (contracts && contracts.length > 0) {
-                                        setSelectedContract(contracts[0]);
-                                        setIsWithdrawDialogOpen(true);
-                                    }
+                                    if (!selectedContract) return;
+                                    setIsWithdrawDialogOpen(true);
                                 }}
                                 className="w-full"
-                                disabled={!contracts?.length}
+                                disabled={!selectedContract}
                             >
                                 <Wallet className="w-4 h-4 mr-2" />
                                 Withdraw Excess
                             </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    if (!selectedContract) return;
+                                    setFundTokenType('reward');
+                                    setFundAmount('100');
+                                    setIsFundDialogOpen(true);
+                                }}
+                                className="w-full mt-2"
+                                disabled={!selectedContract}
+                            >
+                                <ArrowUpFromLine className="w-4 h-4 mr-2" />
+                                Fund Contract
+                            </Button>
+                            <p className="mt-2 text-[11px] text-muted-foreground">
+                                Target: {selectedContract
+                                    ? `${selectedContract.address.slice(0, 8)}...${selectedContract.address.slice(-6)}`
+                                    : 'No contract selected'}
+                            </p>
                         </CardContent>
                     </Card>
                 </AdminWalletGuard>
@@ -306,6 +367,31 @@ export default function NetworkMonitorPage() {
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
+                            <Label>Target Contract</Label>
+                            <Select
+                                value={selectedContract?.address ?? ''}
+                                onValueChange={(value) => {
+                                    const next =
+                                        contracts?.find((c) => c.address === value) ?? null;
+                                    setSelectedContract(next);
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Choose a contract" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(contracts ?? []).map((c) => (
+                                        <SelectItem key={c.id} value={c.address}>
+                                            {c.address.slice(0, 10)}...{c.address.slice(-6)} ({c.rewardTokenSymbol})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                Withdraw excess reward token from the selected staking contract to the connected Admin wallet.
+                            </p>
+                        </div>
+                        <div className="grid gap-2">
                             <Label htmlFor="withdrawAmount">Amount ({selectedContract?.rewardTokenSymbol})</Label>
                             <Input 
                                 id="withdrawAmount" 
@@ -319,6 +405,57 @@ export default function NetworkMonitorPage() {
                         <Button variant="outline" onClick={() => setIsWithdrawDialogOpen(false)}>Cancel</Button>
                         <Button onClick={onWithdrawSubmit} disabled={isWritePending}>
                             {isWritePending ? 'Processing...' : 'Withdraw Rewards'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Fund Dialog */}
+            <Dialog open={isFundDialogOpen} onOpenChange={setIsFundDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Fund Contract</DialogTitle>
+                        <DialogDescription>
+                            Deposit reward/stake token from Admin wallet into this staking contract.
+                            Approve token first if needed.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label>Token Type</Label>
+                            <Select
+                                value={fundTokenType}
+                                onValueChange={(v) => setFundTokenType(v as 'reward' | 'stake')}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="reward">
+                                        Reward ({selectedContract?.rewardTokenSymbol})
+                                    </SelectItem>
+                                    <SelectItem value="stake">
+                                        Stake ({selectedContract?.stakeTokenSymbol})
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="fundAmount">
+                                Amount ({fundTokenType === 'reward' ? selectedContract?.rewardTokenSymbol : selectedContract?.stakeTokenSymbol})
+                            </Label>
+                            <Input
+                                id="fundAmount"
+                                type="number"
+                                value={fundAmount}
+                                onChange={(e) => setFundAmount(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsFundDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={onFundSubmit} disabled={isWritePending}>
+                            {isWritePending ? 'Processing...' : 'Fund Token'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useRegister } from '@/hooks/use-api-queries';
+import { useLogin, useRegister } from '@/hooks/use-api-queries';
 import { cn } from '@/lib/utils';
 
 import { LoginFormSidebar } from './login-form-sidebar';
@@ -17,6 +17,7 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<'div'
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
     const registerMutation = useRegister();
+    const loginMutation = useLogin();
 
     const handleSubmit = useCallback(
         async (e: React.FormEvent<HTMLFormElement>) => {
@@ -25,7 +26,7 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<'div'
 
             const formData = new FormData(e.currentTarget);
             const name = String(formData.get('name') || '').trim();
-            const email = String(formData.get('email') || '').trim();
+            const email = String(formData.get('email') || '').trim().toLowerCase();
             const password = String(formData.get('password') || '');
             const confirmPassword = String(formData.get('confirmPassword') || '');
 
@@ -38,16 +39,24 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<'div'
             }
 
             try {
-                const result = await registerMutation.mutateAsync({ name, email, password });
+                await registerMutation.mutateAsync({ name, email, password });
 
-                toast.success('Registration successful', {
-                    description: result.message || 'Your account has been created successfully.',
-                });
-
-                navigate('/login', {
-                    replace: true,
-                    state: { registeredEmail: email },
-                });
+                try {
+                    await loginMutation.mutateAsync({ email, password });
+                    toast.success('Welcome!', {
+                        description:
+                            'You are signed in. Link your wallet in profile to stake and view positions.',
+                    });
+                    navigate('/app', { replace: true });
+                } catch {
+                    toast.message('Account created', {
+                        description: 'Please sign in with your email and password.',
+                    });
+                    navigate('/login', {
+                        replace: true,
+                        state: { registeredEmail: email },
+                    });
+                }
             } catch (error) {
                 toast.error('Registration failed', {
                     description:
@@ -59,7 +68,7 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<'div'
                 setIsLoading(false);
             }
         },
-        [navigate, registerMutation],
+        [navigate, registerMutation, loginMutation],
     );
 
     return (

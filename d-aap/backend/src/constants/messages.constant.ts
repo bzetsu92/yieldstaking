@@ -18,6 +18,7 @@ export const ERR_MESSAGES = {
         PROFILE_UPDATE_FAILED: "Failed to update profile",
         WALLET_LINK_FAILED: "Failed to link wallet",
         WALLET_ALREADY_LINKED: "Wallet is already linked to another account",
+        ACCOUNT_ALREADY_HAS_WALLET: "This account already has a linked wallet. Re-linking is not allowed.",
         STATISTICS_NOT_FOUND: "User statistics not found",
         EMAIL_INVALID: "Invalid email address",
     },

@@ -5,6 +5,8 @@ import { createPublicClientForChain } from '@/lib/blockchain/client';
 
 import { 
     getYieldStakingContractConfig, 
+    getAureusContractConfig,
+    getMockUsdtContractConfig,
 } from '@/lib/blockchain/contracts';
 import { DEFAULT_CHAIN_ID } from '@/lib/config/chains';
 import { getChainConfig } from '@/lib/config/chains';
@@ -13,6 +15,16 @@ export function useAdminBlockchainActions() {
     const { address } = useAccount();
     const chainId = useChainId() || DEFAULT_CHAIN_ID;
     const stakingConfig = useMemo(() => getYieldStakingContractConfig(chainId), [chainId]);
+    const resolveStakingConfig = useCallback(
+        (contractAddress?: Address) =>
+            contractAddress
+                ? {
+                      ...stakingConfig,
+                      address: contractAddress,
+                  }
+                : stakingConfig,
+        [stakingConfig],
+    );
 
     const { writeContract, data: txHash, isPending: isWritePending, reset } = useWriteContract();
     const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
@@ -126,22 +138,59 @@ export function useAdminBlockchainActions() {
         });
     }, [chainId, ensureReadyToWrite, stakingConfig, writeContract]);
 
-    const withdrawExcessReward = useCallback(async (amount: bigint) => {
+    const withdrawExcessReward = useCallback(async (amount: bigint, contractAddress?: Address) => {
         const account = ensureReadyToWrite();
         const client = createPublicClientForChain(chainId as typeof DEFAULT_CHAIN_ID);
+        const targetConfig = resolveStakingConfig(contractAddress);
         const simulation = await client.simulateContract({
-            ...stakingConfig,
+            ...targetConfig,
             functionName: 'withdrawExcessReward',
             args: [amount],
             account,
         });
         writeContract({
-            ...stakingConfig,
+            ...targetConfig,
             functionName: 'withdrawExcessReward',
             args: [amount],
             gas: simulation.request.gas,
         });
-    }, [chainId, ensureReadyToWrite, stakingConfig, writeContract]);
+    }, [chainId, ensureReadyToWrite, resolveStakingConfig, writeContract]);
+
+    const transferRewardToken = useCallback(async (amount: bigint, to: Address) => {
+        const account = ensureReadyToWrite();
+        const client = createPublicClientForChain(chainId as typeof DEFAULT_CHAIN_ID);
+        const rewardConfig = getMockUsdtContractConfig(chainId);
+        const simulation = await client.simulateContract({
+            ...rewardConfig,
+            functionName: 'transfer',
+            args: [to, amount],
+            account,
+        });
+        writeContract({
+            ...rewardConfig,
+            functionName: 'transfer',
+            args: [to, amount],
+            gas: simulation.request.gas,
+        });
+    }, [chainId, ensureReadyToWrite, writeContract]);
+
+    const transferStakeToken = useCallback(async (amount: bigint, to: Address) => {
+        const account = ensureReadyToWrite();
+        const client = createPublicClientForChain(chainId as typeof DEFAULT_CHAIN_ID);
+        const stakeConfig = getAureusContractConfig(chainId);
+        const simulation = await client.simulateContract({
+            ...stakeConfig,
+            functionName: 'transfer',
+            args: [to, amount],
+            account,
+        });
+        writeContract({
+            ...stakeConfig,
+            functionName: 'transfer',
+            args: [to, amount],
+            gas: simulation.request.gas,
+        });
+    }, [chainId, ensureReadyToWrite, writeContract]);
 
     return {
         pause,
@@ -151,6 +200,8 @@ export function useAdminBlockchainActions() {
         setMaxStakePerUser,
         setMaxTotalStakedPerPackage,
         withdrawExcessReward,
+        transferRewardToken,
+        transferStakeToken,
         isWritePending,
         isConfirming,
         isConfirmed,

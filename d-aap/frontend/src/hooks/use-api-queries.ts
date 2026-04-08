@@ -10,6 +10,7 @@ import {
     logout,
     requestPasswordReset,
     resetPassword,
+    changePassword as changePasswordApi,
     getAuthProfile,
 } from '@/lib/api/auth';
 
@@ -37,6 +38,7 @@ export function useLinkWallet() {
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: ['auth', 'profile'] });
             void queryClient.invalidateQueries({ queryKey: ['user', 'profile'] });
+            void queryClient.invalidateQueries({ queryKey: ['staking'] });
             toast.success('Wallet linked successfully');
         },
     });
@@ -62,13 +64,20 @@ export function useLogin() {
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: ['auth'] });
             void queryClient.invalidateQueries({ queryKey: ['user'] });
+            void queryClient.invalidateQueries({ queryKey: ['staking'] });
         },
     });
 }
 
 export function useRegister() {
+    const queryClient = useQueryClient();
+
     return useMutation({
         mutationFn: (data: RegisterRequest) => registerWithEmailPassword(data),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: ['auth'] });
+            void queryClient.invalidateQueries({ queryKey: ['user'] });
+        },
     });
 }
 
@@ -123,6 +132,13 @@ export function useResetPassword() {
         onSuccess: () => {
             toast.success('Password reset successfully');
         },
+    });
+}
+
+export function useChangePassword() {
+    return useMutation({
+        mutationFn: (data: { currentPassword: string; newPassword: string }) =>
+            changePasswordApi(data),
     });
 }
 

@@ -164,23 +164,19 @@ export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
 
         const walletRole = await this.resolveWalletRole(normalizedAddress);
 
-        // Find user by wallet address (any wallet, not just primary)
         let user = await this.prisma.user.findFirst({
             where: {
-                wallets: {
-                    some: {
-                        walletAddress: normalizedAddress,
-                    },
+                wallet: {
+                    walletAddress: normalizedAddress,
                 },
                 deletedAt: null,
             },
             include: {
-                wallets: true, // Include all wallets to check if wallet exists
+                wallet: true,
             },
         });
 
         if (!user) {
-            // User not found, create new user with this wallet
             const chain = await this.prisma.chain.findFirst({
                 where: { isActive: true },
             });
@@ -198,7 +194,7 @@ export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
                     authMethod: "WALLET",
                     role: walletRole,
                     status: "ACTIVE",
-                    wallets: {
+                    wallet: {
                         create: {
                             chainId: chain.id,
                             walletAddress: normalizedAddress,
@@ -209,10 +205,7 @@ export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
                     },
                 },
                 include: {
-                    wallets: {
-                        where: { walletAddress: normalizedAddress },
-                        take: 1,
-                    },
+                    wallet: true,
                 },
             });
 
@@ -220,15 +213,14 @@ export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
                 `Created new user ${user.id} with wallet ${normalizedAddress}`,
             );
         } else {
-            const existingWallet = user.wallets.find(
-                (w) => w.walletAddress.toLowerCase() === normalizedAddress,
-            );
-
-            if (existingWallet) {
-                // Wallet exists, update verification if needed
-                if (!existingWallet.isVerified) {
+            const w = user.wallet;
+            if (
+                w &&
+                w.walletAddress.toLowerCase() === normalizedAddress
+            ) {
+                if (!w.isVerified) {
                     await this.prisma.userWallet.update({
-                        where: { id: existingWallet.id },
+                        where: { id: w.id },
                         data: {
                             isVerified: true,
                             verifiedAt: new Date(),
@@ -239,43 +231,15 @@ export class MetaMaskAuthService implements OnModuleInit, OnModuleDestroy {
                     `User ${user.id} signed in with existing wallet ${normalizedAddress}`,
                 );
             } else {
-                const chain = await this.prisma.chain.findFirst({
-                    where: { isActive: true },
-                });
-
-                if (!chain) {
-                    throw new BadRequestException(
-                        ERR_MESSAGES.AUTH.NO_ACTIVE_CHAIN,
-                    );
-                }
-
-                await this.prisma.userWallet.deleteMany({
-                    where: { userId: user.id },
-                });
-
-                await this.prisma.userWallet.create({
-                    data: {
-                        userId: user.id,
-                        chainId: chain.id,
-                        walletAddress: normalizedAddress,
-                        isPrimary: true,
-                        isVerified: true,
-                        verifiedAt: new Date(),
-                    },
-                });
-
-                this.logger.log(
-                    `Linked wallet ${normalizedAddress} to user ${user.id} (previous wallets removed)`,
+                this.logger.warn(
+                    `User ${user.id} lookup by wallet ${normalizedAddress} inconsistent (missing or mismatched row)`,
                 );
             }
 
             const reloadedUser = await this.prisma.user.findUnique({
                 where: { id: user.id },
                 include: {
-                    wallets: {
-                        where: { walletAddress: normalizedAddress },
-                        take: 1,
-                    },
+                    wallet: true,
                 },
             });
 

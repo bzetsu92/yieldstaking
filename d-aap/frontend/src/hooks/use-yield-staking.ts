@@ -99,8 +99,7 @@ export function useYieldStaking() {
     const { walletAddress } = useUserInfo();
     const chainId = useChainId() || DEFAULT_CHAIN_ID;
 
-    // Use walletAddress from profile if wagmi address is not available
-    const address = (wagmiAddress || walletAddress) as Address | undefined;
+    const address = (walletAddress ?? wagmiAddress) as Address | undefined;
 
     const stakingConfig = useMemo(() => getYieldStakingContractConfig(chainId), [chainId]);
     const stakingAddress = useMemo(() => getYieldStakingAddress(chainId), [chainId]);
@@ -482,7 +481,7 @@ export function useUserStakes(packageId: number) {
     const { walletAddress } = useUserInfo();
     const chainId = useChainId() || DEFAULT_CHAIN_ID;
     
-    const address = (wagmiAddress || walletAddress) as Address | undefined;
+    const address = (walletAddress ?? wagmiAddress) as Address | undefined;
     
     const stakingConfig = useMemo(() => getYieldStakingContractConfig(chainId), [chainId]);
 

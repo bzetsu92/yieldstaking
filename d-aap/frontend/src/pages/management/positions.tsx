@@ -199,7 +199,7 @@ export default function AdminPositionsPage() {
             cell: ({ row }) => (
                 <div>
                     <Link 
-                        to={`/admin/users`}
+                        to={`/app/management/users`}
                         className="font-medium hover:underline"
                     >
                         {row.original.wallet.user.name}
@@ -252,6 +252,13 @@ export default function AdminPositionsPage() {
             accessorKey: 'lockPeriod',
             header: 'Lock',
             cell: ({ row }) => formatLockPeriod(row.original.lockPeriod),
+        },
+        {
+            accessorKey: 'startTimestamp',
+            header: 'Stake Date',
+            cell: ({ row }) => (
+                <span className="text-sm">{formatDate(row.original.startTimestamp)}</span>
+            ),
         },
         {
             accessorKey: 'unlockTimestamp',

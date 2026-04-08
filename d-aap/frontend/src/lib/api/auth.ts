@@ -212,6 +212,29 @@ export async function resetPassword(data: {
     }
 }
 
+export async function changePassword(data: {
+    currentPassword: string;
+    newPassword: string;
+}): Promise<{ message: string }> {
+    if (!data.currentPassword || !data.newPassword) {
+        throw new Error('Current password and new password are required');
+    }
+
+    if (data.newPassword.length < 8) {
+        throw new Error('Password must be at least 8 characters long');
+    }
+
+    try {
+        return await api.post<{ message: string }>('/v1/auth/change-password', data);
+    } catch (error: unknown) {
+        throw handleApiError({
+            error,
+            context: 'Failed to change password',
+            showToast: false,
+        });
+    }
+}
+
 export async function getAuthProfile(): Promise<{
     id: number;
     email?: string;

@@ -1,17 +1,21 @@
 import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 
 export function TeamSwitcher({
     teams,
+    homeUrl = '/app',
 }: {
     teams: {
         name: string;
         logo: React.ElementType;
         plan: string;
     }[];
+    homeUrl?: string;
 }) {
     const [activeTeam] = React.useState(teams[0]);
+    const navigate = useNavigate();
 
     if (!activeTeam) {
         return null;
@@ -23,6 +27,7 @@ export function TeamSwitcher({
                 <SidebarMenuButton
                     size="lg"
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                    onClick={() => navigate(homeUrl)}
                 >
                     <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                         <activeTeam.logo className="size-4" />

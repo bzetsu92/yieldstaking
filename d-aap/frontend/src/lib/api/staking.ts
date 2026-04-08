@@ -176,15 +176,25 @@ export async function fetchGlobalStatistics(): Promise<GlobalStatistics> {
     }
 }
 
-export async function fetchLeaderboard(limit?: number): Promise<{
+export async function fetchLeaderboard(params?: {
+    limit?: number;
+    contractAddress?: string;
+}): Promise<{
     rank: number;
     walletAddress: string;
     totalStaked: string;
     activeStakes: number;
 }[]> {
     try {
-        const params = limit ? { limit } : undefined;
-        return await api.get('/v1/staking/leaderboard', { params });
+        const requestParams = {
+            ...(params?.limit ? { limit: params.limit } : {}),
+            ...(params?.contractAddress
+                ? { contractAddress: params.contractAddress.toLowerCase() }
+                : {}),
+        };
+        return await api.get('/v1/staking/leaderboard', {
+            params: Object.keys(requestParams).length ? requestParams : undefined,
+        });
     } catch (error: unknown) {
         throw handleApiError({
             error,

@@ -23,19 +23,19 @@ export interface UserInfo {
 export function useUserInfo(): UserInfo {
     const { address, isConnected, chainId } = useAccount();
     const { isAuthenticated } = useAuthentication();
-    const { data: authProfile } = useAuthProfile();
-    const { data: userProfile } = useUserProfile();
+    const { data: authProfile, isPending: authProfilePending } = useAuthProfile();
+    const { data: userProfile, isPending: userProfilePending } = useUserProfile();
 
     return useMemo(() => {
         const backendUser = userProfile?.user || authProfile;
+        const normalizeAddr = (a: string | null | undefined) =>
+            a && isAddress(a) ? getAddress(a) : undefined;
 
         if (backendUser) {
             const displayName = backendUser.name || backendUser.email || 'User';
-            const rawWalletAddress = address || backendUser.walletAddress;
-            const walletAddress =
-                rawWalletAddress && isAddress(rawWalletAddress)
-                    ? getAddress(rawWalletAddress)
-                    : undefined;
+            const linked = normalizeAddr(backendUser.walletAddress ?? undefined);
+            const browser = address && isAddress(address) ? getAddress(address) : undefined;
+            const walletAddress = linked ?? browser;
 
             return {
                 id: backendUser.id?.toString(),
@@ -69,7 +69,20 @@ export function useUserInfo(): UserInfo {
             };
         }
 
-        if (isAuthenticated && !address) {
+        const profilePending = authProfilePending || userProfilePending;
+        if (isAuthenticated && profilePending && !backendUser) {
+            return {
+                name: 'User',
+                displayName: '…',
+                email: '',
+                avatar: '',
+                role: 'USER',
+                authMethod: 'traditional',
+                isConnected: false,
+            };
+        }
+
+        if (isAuthenticated && !address && !profilePending) {
             return {
                 name: 'User',
                 displayName: 'User',
@@ -90,5 +103,14 @@ export function useUserInfo(): UserInfo {
             authMethod: 'guest',
             isConnected: false,
         };
-    }, [address, isConnected, chainId, isAuthenticated, authProfile, userProfile]);
+    }, [
+        address,
+        isConnected,
+        chainId,
+        isAuthenticated,
+        authProfile,
+        userProfile,
+        authProfilePending,
+        userProfilePending,
+    ]);
 }

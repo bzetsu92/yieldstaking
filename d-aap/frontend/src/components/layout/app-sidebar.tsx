@@ -1,6 +1,5 @@
 import {
     GalleryVerticalEnd,
-    Shield,
     Cpu,
     Home,
     Coins,
@@ -68,12 +67,12 @@ const userNavItems = [
 
 const adminNavItems = [
     {
-        title: 'Platform Management',
+        title: 'Admin Management',
         url: '/app/management',
         icon: LayoutDashboard,
         items: [
             {
-                title: 'Dashboard',
+                title: 'Overview',
                 url: '/app/management',
                 icon: LayoutDashboard,
             },
@@ -83,29 +82,29 @@ const adminNavItems = [
                 icon: Users,
             },
             {
-                title: 'Positions',
+                title: 'Stake Positions',
                 url: '/app/management/positions',
                 icon: Briefcase,
             },
             {
-                title: 'Transactions',
+                title: 'On-chain Transactions',
                 url: '/app/management/transactions',
                 icon: Repeat,
             },
         ],
     },
     {
-        title: 'Network Config',
+        title: 'Blockchain Operations',
         url: '/app/network',
         icon: Cpu,
         items: [
             {
-                title: 'Monitor',
+                title: 'Sync Monitor',
                 url: '/app/network/monitor',
                 icon: Activity,
             },
             {
-                title: 'Setup',
+                title: 'Contract Controls',
                 url: '/app/network/setup',
                 icon: Settings2,
             },
@@ -128,7 +127,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return (
         <Sidebar collapsible="icon" {...props}>
             <SidebarHeader>
-                <TeamSwitcher teams={teams} />
+                <TeamSwitcher teams={teams} homeUrl={isAdmin ? '/app/management' : '/app/aureus'} />
             </SidebarHeader>
             <SidebarContent>
                 <NavMain items={navItems} />

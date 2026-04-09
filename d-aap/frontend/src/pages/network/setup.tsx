@@ -7,7 +7,7 @@ import {
     useReactTable,
 } from '@tanstack/react-table';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
-import { ExternalLink, Pause, Play, Database, Wallet, Coins, Package, TrendingUp, Settings, Plus, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import { ExternalLink, Pause, Play, Database, Wallet, Coins, Package, TrendingUp, Settings, Plus, ArrowDownToLine, ArrowUpFromLine, AlertTriangle } from 'lucide-react';
 import { parseUnits, formatUnits } from 'viem';
 import type { Address } from 'viem';
 
@@ -228,17 +228,23 @@ export default function NetworkSetupPage() {
         apyBasisPoints: 2000,
         enabled: true
     });
+    const [packageErrors, setPackageErrors] = React.useState<Record<string, string>>({});
 
     const [isMaxTotalDialogOpen, setIsMaxTotalDialogOpen] = React.useState(false);
     const [isWithdrawRewardDialogOpen, setIsWithdrawRewardDialogOpen] = React.useState(false);
     const [isFundTokenDialogOpen, setIsFundTokenDialogOpen] = React.useState(false);
 
     const [minStakeValue, setMinStakeValue] = React.useState('500');
+    const [minStakeError, setMinStakeError] = React.useState('');
     const [maxStakeValue, setMaxStakeValue] = React.useState('0');
+    const [maxStakeError, setMaxStakeError] = React.useState('');
     const [maxTotalValue, setMaxTotalValue] = React.useState('0');
+    const [maxTotalError, setMaxTotalError] = React.useState('');
     const [withdrawRewardValue, setWithdrawRewardValue] = React.useState('');
+    const [withdrawRewardError, setWithdrawRewardError] = React.useState('');
     const [fundTokenType, setFundTokenType] = React.useState<'reward' | 'stake'>('reward');
     const [fundTokenValue, setFundTokenValue] = React.useState('');
+    const [fundTokenError, setFundTokenError] = React.useState('');
 
     const handleUpdatePackage = (pkg: any) => {
         setPackageForm({
@@ -247,15 +253,35 @@ export default function NetworkSetupPage() {
             apyBasisPoints: pkg.apy,
             enabled: pkg.isEnabled
         });
+        setPackageErrors({});
         setIsPackageDialogOpen(true);
     };
 
     const onSetPackageSubmit = async () => {
         if (!selectedContract) return;
+        
+        // Validation
+        const errors: Record<string, string> = {};
+        if (packageForm.lockPeriodDays <= 0) {
+            errors.lockPeriodDays = 'Lock period must be greater than 0 days';
+        }
+        if (packageForm.apyBasisPoints < 0) {
+            errors.apyBasisPoints = 'APY cannot be negative';
+        }
+        if (packageForm.apyBasisPoints > 10000) {
+            errors.apyBasisPoints = 'APY cannot exceed 100% (10000 basis points)';
+        }
+        
+        if (Object.keys(errors).length > 0) {
+            setPackageErrors(errors);
+            return;
+        }
+        
         try {
             const lockPeriod = BigInt(packageForm.lockPeriodDays) * 86400n;
             await setPackage(packageForm.id, lockPeriod, packageForm.apyBasisPoints, packageForm.enabled);
             setIsPackageDialogOpen(false);
+            setPackageErrors({});
             toast.success('Package update transaction sent');
         } catch (err: any) {
             toast.error(err.message || 'Failed to update package');
@@ -264,10 +290,19 @@ export default function NetworkSetupPage() {
 
     const onSetMinStakeSubmit = async () => {
         if (!selectedContract) return;
+        
+        // Validation
+        if (!minStakeValue || parseFloat(minStakeValue) < 0) {
+            setMinStakeError('Minimum stake amount must be 0 or greater');
+            return;
+        }
+        setMinStakeError('');
+        
         try {
             const amount = parseUnits(minStakeValue, selectedContract.stakeTokenDecimals);
             await setMinStakeAmount(amount);
             setIsMinStakeDialogOpen(false);
+            setMinStakeError('');
             toast.success('Min stake update transaction sent');
         } catch (err: any) {
             toast.error(err.message || 'Failed to update minimum stake');
@@ -276,10 +311,19 @@ export default function NetworkSetupPage() {
 
     const onSetMaxStakeSubmit = async () => {
         if (!selectedContract) return;
+        
+        // Validation
+        if (!maxStakeValue || parseFloat(maxStakeValue) < 0) {
+            setMaxStakeError('Maximum stake amount must be 0 or greater');
+            return;
+        }
+        setMaxStakeError('');
+        
         try {
             const amount = parseUnits(maxStakeValue, selectedContract.stakeTokenDecimals);
             await setMaxStakePerUser(amount);
             setIsMaxStakeDialogOpen(false);
+            setMaxStakeError('');
             toast.success('Max stake update transaction sent');
         } catch (err: any) {
             toast.error(err.message || 'Failed to update maximum stake');
@@ -288,10 +332,19 @@ export default function NetworkSetupPage() {
 
     const onSetMaxTotalSubmit = async () => {
         if (!selectedContract) return;
+        
+        // Validation
+        if (!maxTotalValue || parseFloat(maxTotalValue) < 0) {
+            setMaxTotalError('Maximum total staked must be 0 or greater');
+            return;
+        }
+        setMaxTotalError('');
+        
         try {
             const amount = parseUnits(maxTotalValue, selectedContract.stakeTokenDecimals);
             await setMaxTotalStakedPerPackage(amount);
             setIsMaxTotalDialogOpen(false);
+            setMaxTotalError('');
             toast.success('Max total per package update transaction sent');
         } catch (err: any) {
             toast.error(err.message || 'Failed to update max total per package');
@@ -300,10 +353,19 @@ export default function NetworkSetupPage() {
 
     const onWithdrawRewardSubmit = async () => {
         if (!selectedContract) return;
+        
+        // Validation
+        if (!withdrawRewardValue || parseFloat(withdrawRewardValue) <= 0) {
+            setWithdrawRewardError('Withdraw amount must be greater than 0');
+            return;
+        }
+        setWithdrawRewardError('');
+        
         try {
             const amount = parseUnits(withdrawRewardValue, selectedContract.rewardTokenDecimals);
             await withdrawExcessReward(amount, selectedContract.address as Address);
             setIsWithdrawRewardDialogOpen(false);
+            setWithdrawRewardError('');
             toast.success('Withdraw excess reward transaction sent');
         } catch (err: any) {
             toast.error(err.message || 'Failed to withdraw excess reward');
@@ -312,6 +374,14 @@ export default function NetworkSetupPage() {
 
     const onFundTokenSubmit = async () => {
         if (!selectedContract) return;
+        
+        // Validation
+        if (!fundTokenValue || parseFloat(fundTokenValue) <= 0) {
+            setFundTokenError('Fund amount must be greater than 0');
+            return;
+        }
+        setFundTokenError('');
+        
         try {
             const decimals =
                 fundTokenType === 'reward'
@@ -324,6 +394,7 @@ export default function NetworkSetupPage() {
                 await transferStakeToken(amount, selectedContract.address as Address);
             }
             setIsFundTokenDialogOpen(false);
+            setFundTokenError('');
             toast.success(
                 `Fund ${fundTokenType === 'reward' ? selectedContract.rewardTokenSymbol : selectedContract.stakeTokenSymbol} transaction sent`,
             );
@@ -579,8 +650,18 @@ export default function NetworkSetupPage() {
                                 id="days" 
                                 type="number" 
                                 value={packageForm.lockPeriodDays}
-                                onChange={(e) => setPackageForm({...packageForm, lockPeriodDays: parseInt(e.target.value)})}
+                                onChange={(e) => {
+                                    setPackageForm({...packageForm, lockPeriodDays: parseInt(e.target.value) || 0});
+                                    if (packageErrors.lockPeriodDays) setPackageErrors({...packageErrors, lockPeriodDays: ''});
+                                }}
+                                className={packageErrors.lockPeriodDays ? 'border-destructive' : ''}
                             />
+                            {packageErrors.lockPeriodDays && (
+                                <p className="text-xs text-destructive flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {packageErrors.lockPeriodDays}
+                                </p>
+                            )}
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="apy">APY (Basis Points: 1000 = 10%)</Label>
@@ -588,8 +669,18 @@ export default function NetworkSetupPage() {
                                 id="apy" 
                                 type="number" 
                                 value={packageForm.apyBasisPoints}
-                                onChange={(e) => setPackageForm({...packageForm, apyBasisPoints: parseInt(e.target.value)})}
+                                onChange={(e) => {
+                                    setPackageForm({...packageForm, apyBasisPoints: parseInt(e.target.value) || 0});
+                                    if (packageErrors.apyBasisPoints) setPackageErrors({...packageErrors, apyBasisPoints: ''});
+                                }}
+                                className={packageErrors.apyBasisPoints ? 'border-destructive' : ''}
                             />
+                            {packageErrors.apyBasisPoints && (
+                                <p className="text-xs text-destructive flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {packageErrors.apyBasisPoints}
+                                </p>
+                            )}
                         </div>
                         <div className="flex items-center gap-2">
                             <Checkbox 
@@ -625,8 +716,18 @@ export default function NetworkSetupPage() {
                                 id="minAmount" 
                                 type="number" 
                                 value={minStakeValue}
-                                onChange={(e) => setMinStakeValue(e.target.value)}
+                                onChange={(e) => {
+                                    setMinStakeValue(e.target.value);
+                                    if (minStakeError) setMinStakeError('');
+                                }}
+                                className={minStakeError ? 'border-destructive' : ''}
                             />
+                            {minStakeError && (
+                                <p className="text-xs text-destructive flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {minStakeError}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>
@@ -654,8 +755,18 @@ export default function NetworkSetupPage() {
                                 id="maxAmount" 
                                 type="number" 
                                 value={maxStakeValue}
-                                onChange={(e) => setMaxStakeValue(e.target.value)}
+                                onChange={(e) => {
+                                    setMaxStakeValue(e.target.value);
+                                    if (maxStakeError) setMaxStakeError('');
+                                }}
+                                className={maxStakeError ? 'border-destructive' : ''}
                             />
+                            {maxStakeError && (
+                                <p className="text-xs text-destructive flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {maxStakeError}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>
@@ -682,8 +793,18 @@ export default function NetworkSetupPage() {
                                 id="maxTotal"
                                 type="number"
                                 value={maxTotalValue}
-                                onChange={(e) => setMaxTotalValue(e.target.value)}
+                                onChange={(e) => {
+                                    setMaxTotalValue(e.target.value);
+                                    if (maxTotalError) setMaxTotalError('');
+                                }}
+                                className={maxTotalError ? 'border-destructive' : ''}
                             />
+                            {maxTotalError && (
+                                <p className="text-xs text-destructive flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {maxTotalError}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>
@@ -712,8 +833,18 @@ export default function NetworkSetupPage() {
                                 type="number"
                                 placeholder="0.00"
                                 value={withdrawRewardValue}
-                                onChange={(e) => setWithdrawRewardValue(e.target.value)}
+                                onChange={(e) => {
+                                    setWithdrawRewardValue(e.target.value);
+                                    if (withdrawRewardError) setWithdrawRewardError('');
+                                }}
+                                className={withdrawRewardError ? 'border-destructive' : ''}
                             />
+                            {withdrawRewardError && (
+                                <p className="text-xs text-destructive flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {withdrawRewardError}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>
@@ -764,8 +895,18 @@ export default function NetworkSetupPage() {
                                 type="number"
                                 placeholder="0.00"
                                 value={fundTokenValue}
-                                onChange={(e) => setFundTokenValue(e.target.value)}
+                                onChange={(e) => {
+                                    setFundTokenValue(e.target.value);
+                                    if (fundTokenError) setFundTokenError('');
+                                }}
+                                className={fundTokenError ? 'border-destructive' : ''}
                             />
+                            {fundTokenError && (
+                                <p className="text-xs text-destructive flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {fundTokenError}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>

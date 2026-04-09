@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAccount, useChainId, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits, formatUnits, type Address, maxUint256, BaseError, ContractFunctionRevertedError } from 'viem';
 import { createPublicClientForChain } from '@/lib/blockchain/client';
@@ -15,6 +15,7 @@ import {
 import { DEFAULT_CHAIN_ID } from '@/lib/config/chains';
 import { getChainConfig } from '@/lib/config/chains';
 import { useUserInfo } from './use-user-info';
+import { fetchStakingPackages } from '@/lib/api/staking';
 
 export interface StakePackage {
     id: number;
@@ -98,6 +99,7 @@ export function useYieldStaking() {
     const { address: wagmiAddress } = useAccount();
     const { walletAddress } = useUserInfo();
     const chainId = useChainId() || DEFAULT_CHAIN_ID;
+    const queryClient = useQueryClient();
 
     const address = (walletAddress ?? wagmiAddress) as Address | undefined;
 
@@ -189,34 +191,68 @@ export function useYieldStaking() {
         functionName: 'symbol',
     });
 
-    const PACKAGE_SCAN_IDS = useMemo(
-        () => Array.from({ length: 16 }, (_, i) => i),
-        [],
-    );
+    const { data: backendPackages } = useQuery({
+        queryKey: ['staking-packages', chainId, stakingAddress],
+        queryFn: () => fetchStakingPackages(),
+        staleTime: 60_000, // 1 minute
+    });
+
+    const packageIdsToScan = useMemo(() => {
+        if (backendPackages && backendPackages.length > 0) {
+            const ids = [...new Set(backendPackages.map(p => p.packageId))];
+            return ids.sort((a, b) => a - b);
+        }
+        return Array.from({ length: 32 }, (_, i) => i);
+    }, [backendPackages]);
 
     const packageResults = useReadContracts({
-        contracts: PACKAGE_SCAN_IDS.map((id) => ({
+        contracts: packageIdsToScan.map((id) => ({
             ...stakingConfig,
             functionName: 'packages',
             args: [id],
         })),
+        query: {
+            enabled: packageIdsToScan.length > 0,
+        },
     });
 
     const packages = useMemo<StakePackage[]>(() => {
         if (!packageResults.data) return [];
-        return packageResults.data
-            .map((result, index) => {
-                if (result.status !== 'success' || !result.result) return null;
-                const [lockPeriod, apy, enabled] = result.result as unknown as [bigint, number, boolean];
-                return {
-                    id: PACKAGE_SCAN_IDS[index],
+        
+        const result: StakePackage[] = [];
+        
+        packageResults.data.forEach((res, index) => {
+            if (res.status !== 'success' || !res.result) return;
+            
+            const pkgResult = res.result;
+            let lockPeriod: bigint;
+            let apy: bigint;
+            let enabled: boolean;
+            
+            if (Array.isArray(pkgResult)) {
+                [lockPeriod, apy, enabled] = pkgResult as unknown as [bigint, bigint, boolean];
+            } else if (typeof pkgResult === 'object' && 'lockPeriod' in pkgResult) {
+                const pkg = pkgResult as { lockPeriod: bigint; apy: bigint; enabled: boolean };
+                lockPeriod = pkg.lockPeriod;
+                apy = pkg.apy;
+                enabled = pkg.enabled;
+            } else {
+                return;
+            }
+            
+            // Only return enabled packages
+            if (enabled) {
+                result.push({
+                    id: packageIdsToScan[index],
                     lockPeriod,
                     apy: Number(apy) / 100,
                     enabled,
-                };
-            })
-            .filter((pkg): pkg is StakePackage => pkg !== null && pkg.enabled);
-    }, [PACKAGE_SCAN_IDS, packageResults.data]);
+                });
+            }
+        });
+        
+        return result;
+    }, [packageIdsToScan, packageResults.data]);
 
     const { writeContractAsync, data: txHash, isPending: isWritePending, reset } = useWriteContract();
 
@@ -387,7 +423,11 @@ export function useYieldStaking() {
         refetchUserTotalStakes();
         refetchTokenBalance();
         refetchAllowance();
-    }, [refetchTotalLocked, refetchUserTotalStakes, refetchTokenBalance, refetchAllowance]);
+        // Invalidate package queries to force refetch
+        queryClient.invalidateQueries({ 
+            queryKey: ['readContract', { contract: stakingConfig.address, functionName: 'packages' }] 
+        });
+    }, [refetchTotalLocked, refetchUserTotalStakes, refetchTokenBalance, refetchAllowance, queryClient, stakingConfig.address]);
 
     const decimals = tokenDecimals || 18;
 

@@ -32,11 +32,22 @@ import {
   useLinkWallet,
 } from "@/hooks/use-api-queries";
 import { useUserInfo } from "@/hooks/use-user-info";
+import { useValidation } from "@/hooks/use-validation";
+import { validationRules } from "@/lib/validation";
 import { toast } from "sonner";
 
 import { DatePickerField } from "./date-picker-field";
 import { FormField } from "./form-field";
 import { GENDER_OPTIONS } from "./profile-constants";
+
+interface ProfileFormValues {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  gender: string;
+  dateOfBirth: string;
+  bio: string;
+}
 
 export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
   const userInfo = useUserInfo();
@@ -73,18 +84,53 @@ export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
     };
   }, [profileData, userInfo]);
 
-  const [profile, setProfile] = useState(initialProfile);
   const [avatar, setAvatar] = useState<string | null>(
     initialProfile.avatar || null
   );
 
-  useEffect(() => {
-    setProfile(initialProfile);
-    setAvatar(initialProfile.avatar || null);
-  }, [initialProfile]);
+  const {
+    values: profile,
+    errors,
+    touched,
+    setValue,
+    validateField,
+    handleSubmit,
+    reset,
+  } = useValidation<ProfileFormValues>({
+    initialValues: initialProfile,
+    validationRules: {
+      firstName: [
+        validationRules.required('First name'),
+      ],
+      lastName: [],
+      phone: [
+        validationRules.phone(),
+      ],
+      gender: [],
+      dateOfBirth: [],
+      bio: [],
+    },
+    onSubmit: async (formValues) => {
+      try {
+        const name = `${formValues.firstName} ${formValues.lastName}`.trim();
 
-  const updateField = (k: string, v: any) =>
-    setProfile((p) => ({ ...p, [k]: v }));
+        await updateProfileMutation.mutateAsync({
+          name: name || undefined,
+          bio: formValues.bio || undefined,
+          avatar: avatar || undefined,
+        });
+
+        toast.success("Saved!");
+      } catch {
+        toast.error("Save failed");
+      }
+    },
+  });
+
+  useEffect(() => {
+    reset();
+    setAvatar(initialProfile.avatar || null);
+  }, [initialProfile, reset]);
 
   // ===== AVATAR =====
   const onAvatarChange = (e: any) => {
@@ -105,23 +151,6 @@ export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
   const removeAvatar = () => {
     setAvatar(null);
     if (fileRef.current) fileRef.current.value = "";
-  };
-
-  // ===== SAVE =====
-  const handleSave = async () => {
-    try {
-      const name = `${profile.firstName} ${profile.lastName}`.trim();
-
-      await updateProfileMutation.mutateAsync({
-        name: name || undefined,
-        bio: profile.bio || undefined,
-        avatar: avatar || undefined,
-      });
-
-      toast.success("Saved!");
-    } catch {
-      toast.error("Save failed");
-    }
   };
 
   const handleLink = async () => {
@@ -209,13 +238,20 @@ export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
                 id="first"
                 label="First Name"
                 value={profile.firstName}
-                onChange={(v) => updateField("firstName", v)}
+                onChange={(v) => setValue("firstName", v)}
+                onBlur={() => validateField("firstName")}
+                error={errors.firstName}
+                touched={touched.firstName}
+                required
               />
               <FormField
                 id="last"
                 label="Last Name"
                 value={profile.lastName}
-                onChange={(v) => updateField("lastName", v)}
+                onChange={(v) => setValue("lastName", v)}
+                onBlur={() => validateField("lastName")}
+                error={errors.lastName}
+                touched={touched.lastName}
               />
             </div>
 
@@ -224,14 +260,17 @@ export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
                 id="phone"
                 label="Phone"
                 value={profile.phone}
-                onChange={(v) => updateField("phone", v)}
+                onChange={(v) => setValue("phone", v)}
+                onBlur={() => validateField("phone")}
+                error={errors.phone}
+                touched={touched.phone}
               />
 
               <div>
                 <Label>Gender</Label>
                 <Select
                   value={profile.gender}
-                  onValueChange={(v) => updateField("gender", v)}
+                  onValueChange={(v) => setValue("gender", v)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -251,7 +290,15 @@ export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
               id="dob"
               label="Date of Birth"
               value={profile.dateOfBirth}
-              onChange={(v) => updateField("dateOfBirth", v)}
+              onChange={(v) => setValue("dateOfBirth", v)}
+            />
+
+            <FormField
+              id="bio"
+              label="Bio"
+              value={profile.bio}
+              onChange={(v) => setValue("bio", v)}
+              placeholder="Tell us about yourself..."
             />
           </CardContent>
         </Card>
@@ -337,7 +384,7 @@ export function AccountSettingsForm({ onCancel }: { onCancel?: () => void }) {
           Cancel
         </Button>
         <Button
-          onClick={handleSave}
+          onClick={handleSubmit}
           disabled={updateProfileMutation.isPending || isLoading}
         >
           {updateProfileMutation.isPending

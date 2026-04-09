@@ -7,7 +7,7 @@ import {
     useReactTable,
 } from '@tanstack/react-table';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
-import { RefreshCw, Play, AlertCircle, CheckCircle, Clock, Database, Activity, Inbox, Zap, Wallet, ShieldAlert, Coins, ArrowUpFromLine } from 'lucide-react';
+import { RefreshCw, Play, AlertCircle, CheckCircle, Clock, Database, Activity, Inbox, Zap, Wallet, ShieldAlert, Coins, ArrowUpFromLine, AlertTriangle } from 'lucide-react';
 import { parseUnits } from 'viem';
 import { useChainId } from 'wagmi';
 import type { Address } from 'viem';
@@ -68,9 +68,11 @@ export default function NetworkMonitorPage() {
 
     const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = React.useState(false);
     const [withdrawAmount, setWithdrawAmount] = React.useState('100');
+    const [withdrawError, setWithdrawError] = React.useState('');
     const [selectedContract, setSelectedContract] = React.useState<any>(null);
     const [isFundDialogOpen, setIsFundDialogOpen] = React.useState(false);
     const [fundAmount, setFundAmount] = React.useState('100');
+    const [fundError, setFundError] = React.useState('');
     const [fundTokenType, setFundTokenType] = React.useState<'reward' | 'stake'>('reward');
     const configuredContractAddress = getYieldStakingAddress(chainId).toLowerCase();
 
@@ -84,10 +86,19 @@ export default function NetworkMonitorPage() {
 
     const onWithdrawSubmit = async () => {
         if (!selectedContract) return;
+        
+        // Validation
+        if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+            setWithdrawError('Withdraw amount must be greater than 0');
+            return;
+        }
+        setWithdrawError('');
+        
         try {
             const amount = parseUnits(withdrawAmount, selectedContract.rewardTokenDecimals);
             await withdrawExcessReward(amount, selectedContract.address as Address);
             setIsWithdrawDialogOpen(false);
+            setWithdrawError('');
             toast.success('Withdraw transaction sent');
         } catch (err: any) {
             toast.error(err.message || 'Failed to withdraw excess rewards');
@@ -96,6 +107,14 @@ export default function NetworkMonitorPage() {
 
     const onFundSubmit = async () => {
         if (!selectedContract) return;
+        
+        // Validation
+        if (!fundAmount || parseFloat(fundAmount) <= 0) {
+            setFundError('Fund amount must be greater than 0');
+            return;
+        }
+        setFundError('');
+        
         try {
             const decimals =
                 fundTokenType === 'reward'
@@ -108,6 +127,7 @@ export default function NetworkMonitorPage() {
                 await transferStakeToken(amount, selectedContract.address as Address);
             }
             setIsFundDialogOpen(false);
+            setFundError('');
             toast.success('Fund transaction sent');
         } catch (err: any) {
             toast.error(err.message || 'Failed to fund contract');
@@ -397,8 +417,18 @@ export default function NetworkMonitorPage() {
                                 id="withdrawAmount" 
                                 type="number" 
                                 value={withdrawAmount}
-                                onChange={(e) => setWithdrawAmount(e.target.value)}
+                                onChange={(e) => {
+                                    setWithdrawAmount(e.target.value);
+                                    if (withdrawError) setWithdrawError('');
+                                }}
+                                className={withdrawError ? 'border-destructive' : ''}
                             />
+                            {withdrawError && (
+                                <p className="text-xs text-destructive flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {withdrawError}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>
@@ -448,8 +478,18 @@ export default function NetworkMonitorPage() {
                                 id="fundAmount"
                                 type="number"
                                 value={fundAmount}
-                                onChange={(e) => setFundAmount(e.target.value)}
+                                onChange={(e) => {
+                                    setFundAmount(e.target.value);
+                                    if (fundError) setFundError('');
+                                }}
+                                className={fundError ? 'border-destructive' : ''}
                             />
+                            {fundError && (
+                                <p className="text-xs text-destructive flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {fundError}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>

@@ -30,11 +30,6 @@ contract YieldStaking is
     IERC20Metadata public immutable stakeToken;
     IERC20Metadata public immutable rewardToken;
 
-    /// @notice ERC20 decimals of stake token (cached at deploy)
-    uint8 public immutable stakeTokenDecimals;
-    /// @notice ERC20 decimals of reward token (cached at deploy)
-    uint8 public immutable rewardTokenDecimals;
-
     // Package config bounds
     uint32 public constant MIN_APY = 100; // 1%
     uint32 public constant MAX_APY = 10_000; // 100%
@@ -42,9 +37,9 @@ contract YieldStaking is
     uint64 public constant MAX_LOCK_PERIOD = 1460 days; // 4 years
 
     struct StakeInfo {
-        uint128 balance;
-        uint128 rewardTotal;
-        uint128 rewardClaimed;
+        uint128 balance; // principal
+        uint128 rewardTotal; // total reward for full lock
+        uint128 rewardClaimed; // already claimed reward
         uint64 lockPeriod; // snapshot lock period
         uint32 unlockTimestamp; // start + lockPeriod (uint32 safe until 2106)
         uint32 lastClaimTimestamp; // last claim time (uint32 safe until 2106)
@@ -143,15 +138,13 @@ contract YieldStaking is
         stakeToken = _stakeToken;
         rewardToken = _rewardToken;
 
-        uint8 stakeDec = stakeToken.decimals();
-        uint8 rewardDec = rewardToken.decimals();
-        require(stakeDec <= 18, "Stake decimals > 18");
-        require(rewardDec <= 18, "Reward decimals > 18");
+        // Validate token decimals
+        uint8 stakeDecimals = stakeToken.decimals();
+        uint8 rewardDecimals = rewardToken.decimals();
+        require(stakeDecimals <= 18, "Stake decimals > 18");
+        require(rewardDecimals <= 18, "Reward decimals > 18");
 
-        stakeTokenDecimals = stakeDec;
-        rewardTokenDecimals = rewardDec;
-
-        minStakeAmount = 100 * 10 ** stakeDec;
+        minStakeAmount = 500 * 10 ** stakeDecimals; // 
 
         // default packages with validated bounds
         packages[0] = PackageConfig(90 days, 2000, true);
@@ -166,27 +159,6 @@ contract YieldStaking is
             admin,
             operator
         );
-    }
-
-    function _pow10(uint8 d) private pure returns (uint256) {
-        return 10 ** uint256(d);
-    }
-
-    /**
-     * @notice Reward in reward-token smallest units (matches balanceOf / transfers).
-     * @dev Raw APY math uses stake amount wei; scale to reward decimals vs stake decimals.
-     */
-    function _computeRewardTotal(
-        uint256 amount,
-        uint64 lockPeriod,
-        uint32 apy
-    ) internal view returns (uint256) {
-        uint256 raw = Math.mulDiv(amount * apy, lockPeriod, 365 days * 10_000);
-        if (stakeTokenDecimals == rewardTokenDecimals) {
-            return raw;
-        }
-        return
-            Math.mulDiv(raw, _pow10(rewardTokenDecimals), _pow10(stakeTokenDecimals));
     }
 
     /* ========================= ADMIN FUNCTIONS ========================= */
@@ -288,10 +260,10 @@ contract YieldStaking is
             "StakeId overflow"
         );
 
-        uint256 rewardTotal = _computeRewardTotal(
-            amount,
+        uint256 rewardTotal = Math.mulDiv(
+            amount * pkg.apy,
             pkg.lockPeriod,
-            pkg.apy
+            365 days * 10_000
         );
 
         require(rewardTotal <= type(uint128).max, "Reward too large");
@@ -341,7 +313,6 @@ contract YieldStaking is
 
     /**
      * @notice Claim accumulated rewards
-     * @dev claimable = rewardTotal * elapsed / lockPeriod — all in reward-token wei (see StakeInfo).
      */
     function claim(
         uint8 packageId,
@@ -460,9 +431,6 @@ contract YieldStaking is
         );
     }
 
-    /**
-     * @notice Claimable amount in reward-token smallest units (matches safeTransfer in claim()).
-     */
     function getClaimableRewardsForStake(
         address user,
         uint8 packageId,

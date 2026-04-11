@@ -574,7 +574,7 @@ describe("YieldStaking", function () {
       expect(lostReward).to.be.gt(0);
     });
 
-    it("emits EmergencyWithdrawn with lostReward amount", async function () {
+    it("Kiểm tra event EmergencyWithdrawn ghi nhận đúng giá trị lost reward", async function () {
       /*
       Bước thực hiện:
       1. User1 stake 1000 token vào package 0 (90 ngày, APY 20%).
@@ -605,7 +605,15 @@ describe("YieldStaking", function () {
   });
 
   describe("Pause / Unpause", function () {
-    it("only admin can pause and unpause", async function () {
+    it("Kiểm tra chỉ tài khoản admin được phép pause và unpause", async function () {
+      /*
+      Bước thực hiện:
+      1. Khởi tạo contract với admin, user1, staking.
+      2. User1 gọi pause() -> giao dịch revert vì không có quyền.
+      3. Admin gọi pause() -> giao dịch thành công.
+      4. User1 gọi unpause() -> giao dịch revert vì không có quyền.
+      5. Admin gọi unpause() -> giao dịch thành công.
+      */
       const { admin, user1, staking } = await networkHelpers.loadFixture(deployFixture);
 
       await expect(staking.connect(user1).pause()).to.be.revert(ethers);
@@ -615,7 +623,16 @@ describe("YieldStaking", function () {
       await expect(staking.connect(admin).unpause()).to.not.be.revert(ethers);
     });
 
-    it("reverts stake/claim/withdraw when paused", async function () {
+    it("Kiểm tra không cho phép stake/claim/withdraw khi contract đã bị pause", async function () {
+      /*
+      Bước thực hiện:
+      1. Khởi tạo contract với admin, user1, staking, stakeToken.
+      2. User1 stake 1000 token vào package 0 -> thành công.
+      3. Admin gọi pause() để tạm dừng contract.
+      4. User1 gọi stake() lại lần nữa -> giao dịch revert vì contract đang bị tạm dừng.
+      5. User1 gọi claim() -> giao dịch revert vì contract đang bị tạm dừng.
+      6. User1 gọi withdraw() -> giao dịch revert vì contract đang bị tạm dừng.
+      */
       const { admin, user1, staking, stakeToken } = await networkHelpers.loadFixture(deployFixture);
       const amount = ethers.parseEther("1000");
 
@@ -630,30 +647,48 @@ describe("YieldStaking", function () {
   });
 
   describe("Views", function () {
-    it("getClaimableRewardsForStake returns 0 when no stake", async function () {
+    it("Kiểm tra hàm getClaimableRewardsForStake trả về 0 khi user chưa stake", async function () {
+      /*Bước thực hiện:
+      1. Khởi tạo contract với user1, staking.
+      2. Gọi getClaimableRewardsForStake(user1.address, 0, 0) khi user1 chưa stake gì.
+      Exp: Hàm trả về 0 vì user chưa có stake nào với stakeId đó.
+      */
       const { user1, staking } = await networkHelpers.loadFixture(deployFixture);
       expect(await staking.getClaimableRewardsForStake(user1.address, 0, 0)).to.equal(0);
     });
 
-    it("getClaimableRewardsForStake caps at remaining reward", async function () {
+    it("Kiểm tra hàm getClaimableRewardsForStake chỉ trả về tối đa số reward còn lại", async function () {
+      /*Bước thực hiện:
+      1. Khởi tạo contract với user1, staking, stakeToken.
+      2. User1 stake 1000 token vào package 0 -> thành công.
+      3. Fast forward thời gian đến sau khi unlock (90 ngày + 1) bằng cách setNextBlockTimestamp.
+      4. User1 gọi claim() để claim một phần reward
+      5. Fast forward thời gian thêm 180 ngày nữa để đảm bảo đã vượt thời gian khóa và phần reward còn lại đã tích lũy đủ.
+      3. Gọi getClaimableRewardsForStake(user1.address, 0, 0) và kiểm tra giá trị trả về.
+      Exp: Giá trị trả về không được vượt quá số reward còn lại trong package.
+      */
+     //Arrange: Khởi tạo dữ liệu kiểm thử và tạo stake ban đầu
       const { user1, staking, stakeToken } = await networkHelpers.loadFixture(deployFixture);
       const amount = ethers.parseEther("1000");
 
       await stakeToken.connect(user1).approve(await staking.getAddress(), amount);
       await staking.connect(user1).stake(amount, 0);
 
+      //Tăng thời gian đến giữa kì và claim 1 phần reward
       const before = await staking.userStakeHistory(user1.address, 0, 0);
       const firstClaimTimestamp = Number(before.lastClaimTimestamp) + 45 * DAY;
 
       await networkHelpers.time.setNextBlockTimestamp(firstClaimTimestamp);
       await staking.connect(user1).claim(0, 0);
 
+      //Chuẩn bị dữ liệu kì vọng sau khi đã clam 1 phần
       const afterClaim = await staking.userStakeHistory(user1.address, 0, 0);
       const unlockTimestamp = Number(afterClaim.unlockTimestamp);
 
+      //Tăng thời gian vượt quá thời điểm unlock
       await networkHelpers.time.setNextBlockTimestamp(unlockTimestamp + 180 * DAY);
       await networkHelpers.mine();
-
+      //Gọi hàm lấy số reward có thể claim được tại thời điểm này
       const claimable = await staking.getClaimableRewardsForStake(user1.address, 0, 0);
 
       const claimUntil = BigInt(unlockTimestamp); // vì đã vượt unlock, hàm sẽ cap ở unlock
@@ -662,10 +697,24 @@ describe("YieldStaking", function () {
       const remaining = afterClaim.rewardTotal - afterClaim.rewardClaimed;
       const expected = reward > remaining ? remaining : reward;
 
+      //Assert: Kiểm tra giá trị trả về có đúng như kì vọng không
       expect(claimable).to.equal(expected);
     });
 
-    it("getStakeCount returns monotonic counter", async function () {
+    it("Kiểm tra hàm getStakeCount trả về số lượng stake đúng", async function () {
+      /*Bước thực hiện:
+      1. Khởi tạo contract với user1, staking, stakeToken.
+      2. Thiết lập số lượng stake là 1000 token
+      3. Sử dụng account user1 gọi hàm approve() để cấp quyền cho contract được sử dụng 2000 token
+      4. Gọi getStakeCount(user1.address, 0) để kiểm tra số lượng stake ban đầu, exp: trả về 0.
+      5. User1 gọi stake() để tạo 1 stake đầu tiên vào package 0.
+      6. Gọi getStakeCount(user1.address, 0) để kiểm tra số lượng stake sau khi tạo stake đầu tiên, exp: trả về 1.
+      7. User1 gọi stake() để tạo thêm 1 stake nữa vào package 0.
+      8. Gọi getStakeCount(user1.address, 0) để kiểm tra số lượng stake sau khi tạo stake thứ hai, exp: trả về 2.
+      9. Fast forward thời gian đến sau khi unlock (90 ngày + 1) bằng cách setNextBlockTimestamp.
+      10. User1 gọi withdraw(0,0) để rút stake đầu tiên.
+      11. Gọi getStakeCount(user1.address, 0) để kiểm tra số lượng stake sau khi rút stake đầu tiên, exp: vẫn trả về 2 vì dù đã rút nhưng thông tin stake vẫn còn trong lịch sử.
+      */
       const { user1, staking, stakeToken } = await networkHelpers.loadFixture(deployFixture);
       const amount = ethers.parseEther("1000");
       await stakeToken.connect(user1).approve(await staking.getAddress(), amount * 2n);
@@ -681,8 +730,17 @@ describe("YieldStaking", function () {
     });
   });
 
-  describe("Gas profiling (optional)", function () {
-    it("records gas for stake()", async function () {
+  describe("Gas profiling", function () {
+    it("Kiểm tra giao dịch stake() tiêu tốn gas hợp lệ", async function () {
+      /*
+      Bước thực hiện:
+      1. Khởi tạo contract với user1, staking, stakeToken.
+      2. Thiết lập số lượng stake là 1000 token
+      3. User1 gọi approve() để cấp quyền cho staking contract sử dụng token của user1.
+      4. User1 gọi stake() để tạo 1 stake vào package 0.
+      5. Ghi nhận lượng gas tiêu tốn cho giao dịch stake() và kiểm tra giá trị gasUsed của giao dịch.
+      Exp: gasUsed phải lớn hơn 0
+      */
       const { user1, staking, stakeToken } = await networkHelpers.loadFixture(deployFixture);
       const amount = ethers.parseEther("1000");
       await stakeToken.connect(user1).approve(await staking.getAddress(), amount);
@@ -691,7 +749,16 @@ describe("YieldStaking", function () {
       expect(receipt!.gasUsed).to.be.gt(0);
     });
 
-    it("records gas for claim()", async function () {
+    it("Kiểm tra giao dịch claim() tiêu tốn gas hợp lệ", async function () {
+      /*
+      Bước thực hiện:
+      1. Khởi tạo contract với user1, staking, stakeToken.
+      2. User1 stake 1000 token vào package 0.
+      3. Fast forward thời gian đến giữa chừng (45 ngày) bằng cách setNextBlockTimestamp.
+      4. User1 gọi claim() cho stake đó.
+      5. Ghi nhận lượng gas tiêu tốn cho giao dịch claim() và kiểm tra giá trị gasUsed của giao dịch.
+      Exp: gasUsed phải lớn hơn 0
+      */
       const { user1, staking, stakeToken } = await networkHelpers.loadFixture(deployFixture);
       const amount = ethers.parseEther("1000");
       await stakeToken.connect(user1).approve(await staking.getAddress(), amount);
@@ -702,7 +769,16 @@ describe("YieldStaking", function () {
       expect(receipt!.gasUsed).to.be.gt(0);
     });
 
-    it("records gas for withdraw()", async function () {
+    it("Kiểm tra giao dịch withdraw() tiêu tốn gas hợp lệ", async function () {
+      /*
+      Bước thực hiện:
+      1. Khởi tạo contract với user1, staking, stakeToken.
+      2. User1 stake 1000 token vào package 0.
+      3. Fast forward thời gian đến sau khi unlock (90 ngày + 1) bằng cách setNextBlockTimestamp.
+      4. User1 gọi withdraw(0,0) cho stake đó.
+      5. Ghi nhận lượng gas tiêu tốn cho giao dịch withdraw() và kiểm tra giá trị gasUsed của giao dịch.
+      Exp: gasUsed phải lớn hơn 0
+      */
       const { user1, staking, stakeToken } = await networkHelpers.loadFixture(deployFixture);
       const amount = ethers.parseEther("1000");
       await stakeToken.connect(user1).approve(await staking.getAddress(), amount);
@@ -713,7 +789,17 @@ describe("YieldStaking", function () {
       expect(receipt!.gasUsed).to.be.gt(0);
     });
 
-    it("records gas for emergencyWithdraw()", async function () {
+    it("Kiểm tra giao dịch emergencyWithdraw() tiêu tốn gas hợp lệ", async function () {
+      /*
+      Bước thực hiện:
+      1. Khởi tạo contract với admin, user1, staking, stakeToken.
+      2. User1 stake 1000 token vào package 0.
+      3. Fast forward thời gian đến giữa chừng (30 ngày) bằng cách setNextBlockTimestamp.
+      4. Admin gọi pause() để tạm dừng contract.
+      5. User1 gọi emergencyWithdraw(0,0) cho stake đó.
+      6. Ghi nhận lượng gas tiêu tốn cho giao dịch emergencyWithdraw() và kiểm tra giá trị gasUsed của giao dịch.
+      Exp: gasUsed phải lớn hơn 0
+      */
       const { admin, user1, staking, stakeToken } = await networkHelpers.loadFixture(deployFixture);
       const amount = ethers.parseEther("1000");
       await stakeToken.connect(user1).approve(await staking.getAddress(), amount);
